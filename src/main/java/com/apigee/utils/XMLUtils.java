@@ -337,9 +337,16 @@ public class XMLUtils {
 		if (rootElement == null) {
 			rootElement = operationName;
 		}
-		
-		String newXsltTemplate = new Scanner(getClass()
-                .getResourceAsStream(xsltTemplate), "UTF-8")
+
+		InputStream template = getClass().getResourceAsStream(xsltTemplate);
+		if (template == null){
+			template = new FileInputStream(xsltTemplate);
+			if (template == null) {
+				throw new IllegalArgumentException("XSLT template has not found: " + xsltTemplate);
+			}
+		}
+
+		String newXsltTemplate = new Scanner(template, "UTF-8")
         		.useDelimiter("\\A").next()
                 .replaceAll("@@ROOT", rootElement)
                 .replaceAll("@@PREFIX", prefix)

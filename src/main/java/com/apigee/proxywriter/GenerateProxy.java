@@ -170,6 +170,8 @@ public class GenerateProxy {
 
     private String wsdlContent;
 
+    private String xsltTemplate = null;
+
     private Boolean backendUrlValidation;
 
     private String selectedOperationsJson;
@@ -314,6 +316,8 @@ public class GenerateProxy {
     public void setOAuth(boolean oauth) {
         OAUTH = oauth;
     }
+
+    public void setTemplate(String template) { xsltTemplate = template; }
 
     public String getTargetEndpoint() {
         return targetEndpoint;
@@ -2599,6 +2603,12 @@ public class GenerateProxy {
                                     }
                                     String prefix = getPrefix(namespaceUri);
 
+                                    if ( xsltTemplate != null ){
+                                        xmlUtils.generateRootNamespaceXSLT(xsltTemplate, SOAP2API_XSL,
+                                                op.getName(), prefix, requestElement.getName(), namespaceUri,
+                                                namespace);
+                                    }
+                                    else
                                     if (soapVersion.equalsIgnoreCase(SOAP_11)) {
                                         xmlUtils.generateRootNamespaceXSLT(SOAP2API_XSLT11_TEMPLATE, SOAP2API_XSL,
                                             op.getName(), prefix, requestElement.getName(), namespaceUri,
@@ -2972,6 +2982,7 @@ public class GenerateProxy {
         System.out.println("-opsmap=opsmapping.xml    mapping file that to map wsdl operation to http verb");
         System.out.println("-allpost=<true|false>     set to true if all operations are http verb; default is false");
         System.out.println("-vhosts=<comma separated values for virtuals hosts>");
+        System.out.println("-template=path to custom XSLT template");
         System.out.println("-build=specify build folder   default is temp/tmp");
         System.out.println("-oauth=<true|false>       default is false");
         System.out.println("-apikey=<true|false>      default is false");
@@ -3087,6 +3098,8 @@ public class GenerateProxy {
         opt.getSet().addOption("apikey", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // add impose quota policy
         opt.getSet().addOption("quota", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // set custom template for XSLT
+        opt.getSet().addOption("template", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set basepath
         opt.getSet().addOption("basepath", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set target backend url
@@ -3172,6 +3185,10 @@ public class GenerateProxy {
 
         if (opt.getSet().isSet("cors")) {
             genProxy.setCORS(new Boolean(opt.getSet().getOption("cors").getResultValue(0)));
+        }
+
+        if (opt.getSet().isSet("template")) {
+            genProxy.setTemplate(opt.getSet().getOption("template").getResultValue(0));
         }
 
         if (opt.getSet().isSet("oauth")) {

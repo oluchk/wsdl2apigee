@@ -31,6 +31,7 @@ vhosts=default
 oauth=false               Don't add the oauth policy
 apikey=false              Don't add apikey verification
 quota=false               Works only if apikey or oauth is set
+template=<Path>           Path to custom template which used for request transformation (aka "add namespace")
 basepath=Uses the basepath from the wsdl
 cors=false                Don't enable CORS; Works only for SOAP to REST
 build=specify build folder   default is temp folder; ensure user has access to read/write to temp folder

@@ -5,7 +5,7 @@
 	<xsl:output indent="yes" method="xml" encoding="utf-8"
 		omit-xml-declaration="yes" />
 
-	<!-- Stylesheet to inject namespaces into a document in specific places -->
+	<!-- Custom Stylesheet to inject namespaces into a document in specific places -->
 	<xsl:template match="/">
 		<soapenv:Envelope>
 			<soapenv:Header />
@@ -54,7 +54,6 @@
 	
 	<xsl:template match="*[not(local-name()='Root') and not(local-name()='Array')]" name="copy-all">
 		<xsl:element name="@@PREFIX:{local-name()}">
-			<xsl:copy-of select="namespace::*"/>
 			<xsl:apply-templates select="node()|@*"/>
 		</xsl:element>
 	</xsl:template>
@@ -63,4 +62,11 @@
 	<xsl:template match="comment() | processing-instruction()">
 		<xsl:copy />
 	</xsl:template>
+
+    <xsl:template match="@*">
+        <xsl:attribute name="{local-name()}">
+            <xsl:value-of select="."/>
+        </xsl:attribute>
+    </xsl:template>
+    
 </xsl:stylesheet>

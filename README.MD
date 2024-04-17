@@ -29,9 +29,11 @@ port=If the service contains > 1 port, specify the port name. Otherwise, the fir
 debug=false               Set to true to enable trace.
 vhosts=default
 oauth=false               Don't add the oauth policy
+basic=false               Don't add the basic policy
 apikey=false              Don't add apikey verification
 quota=false               Works only if apikey or oauth is set
-template=<Path>           Path to custom template which used for request transformation (aka "add namespace")
+templates=<Path>          Path to custom templates which can be used for request transformation and for policies
+header=false              Don't add SOAP header processing
 basepath=Uses the basepath from the wsdl
 cors=false                Don't enable CORS; Works only for SOAP to REST
 build=specify build folder   default is temp folder; ensure user has access to read/write to temp folder
@@ -138,3 +140,10 @@ A file that maps WSDL operations to HTTP Verbs. A Sample Ops Mapping file looks 
 }
 ```
 
+## Custom templates 
+
+In case of custom template folder is configured, wsdl2apigee will use it as a primary source
+for templates (aka xml, xsl or js files). Default java resources will be used as a 
+secondary template sources.
+
+_Template folder structure should duplicate structure of the resource folder._

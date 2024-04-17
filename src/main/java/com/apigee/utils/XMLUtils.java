@@ -341,9 +341,6 @@ public class XMLUtils {
 		InputStream template = getClass().getResourceAsStream(xsltTemplate);
 		if (template == null){
 			template = new FileInputStream(xsltTemplate);
-			if (template == null) {
-				throw new IllegalArgumentException("XSLT template has not found: " + xsltTemplate);
-			}
 		}
 
 		String newXsltTemplate = new Scanner(template, "UTF-8")

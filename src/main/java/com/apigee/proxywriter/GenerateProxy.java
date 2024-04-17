@@ -108,6 +108,7 @@ public class GenerateProxy {
     private static final String SOAP2API_XSLT12POLICY_TEMPLATE = "/templates/soap2api/add-namespace12.xml";
     private static final String SOAP2API_XSLT12_TEMPLATE = "/templates/soap2api/add-namespace12.xslt";
     private static final String SOAP2API_JSON_TO_XML_TEMPLATE = "/templates/soap2api/json-to-xml.xml";
+    private static final String SOAP2API_XSLT_HEADER_TEMPLATE = "/templates/soap2api/add-soap-header.xslt";
     private static final String SOAP2API_ADD_SOAPACTION_TEMPLATE = "/templates/soap2api/add-soapaction.xml";
     // open-api feature
     private static final String SOAP2API_RETURN_OPENAPI_TEMPLATE = "/templates/soap2api/return-open-api.xml";
@@ -137,6 +138,10 @@ public class GenerateProxy {
     private boolean ALLPOST;
     // set this to true if oauth should be added to the proxy
     private boolean OAUTH;
+    // set this to true if basic should be added to the proxy
+    private boolean BASIC;
+    // set this to true if SOAP header processing should be added to the proxy
+    private boolean HEADER;
     // set this to true if apikey should be added to the proxy
     private boolean APIKEY;
     // enable this flag if api key based quota is enabled
@@ -170,7 +175,7 @@ public class GenerateProxy {
 
     private String wsdlContent;
 
-    private String xsltTemplate = null;
+    private String templateFolder;
 
     private Boolean backendUrlValidation;
 
@@ -235,10 +240,13 @@ public class GenerateProxy {
         vHosts.add("default");
 
         buildFolder = null;
+        templateFolder = null;
         soapVersion = SOAP_12;
         ALLPOST = false;
         PASSTHRU = false;
         OAUTH = false;
+        BASIC = false;
+        HEADER = false;
         APIKEY = false;
         QUOTAAPIKEY = false;
         QUOTAOAUTH = false;
@@ -317,10 +325,32 @@ public class GenerateProxy {
         OAUTH = oauth;
     }
 
-    public void setTemplate(String template) { xsltTemplate = template; }
+    public void setBasic(boolean basic) {
+        BASIC = basic;
+    }
+
+    public void setHeader(boolean header) {
+        HEADER = header;
+    }
+
+    public void setTemplateFolder(String folder) { templateFolder = folder; }
 
     public String getTargetEndpoint() {
         return targetEndpoint;
+    }
+
+    private String getTemplate(String defaultTemplate){
+        if (templateFolder != null) {
+            if (templateFolder.endsWith(File.separator)){
+                templateFolder = templateFolder.substring(0, templateFolder.length() - File.separator.length());
+            }
+            String path = defaultTemplate.replaceAll("^/templates", templateFolder);
+            File file = new File(path);
+            if (file.exists() && file.isFile()) {
+                return file.getAbsolutePath();
+            }
+        }
+        return defaultTemplate;
     }
 
     private void writeAPIProxy(String proxyDescription) throws Exception {
@@ -331,9 +361,9 @@ public class GenerateProxy {
         Document apiTemplateDocument;
 
         if (PASSTHRU) {
-            apiTemplateDocument = xmlUtils.readXML(SOAPPASSTHRU_APIPROXY_TEMPLATE);
+            apiTemplateDocument = xmlUtils.readXML( getTemplate(SOAPPASSTHRU_APIPROXY_TEMPLATE) );
         } else {
-            apiTemplateDocument = xmlUtils.readXML(SOAP2API_APIPROXY_TEMPLATE);
+            apiTemplateDocument = xmlUtils.readXML( getTemplate(SOAP2API_APIPROXY_TEMPLATE) );
         }
         LOGGER.finest("Read API Proxy template file");
 
@@ -369,9 +399,10 @@ public class GenerateProxy {
 
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
+
         XMLUtils xmlUtils = new XMLUtils();
 
-        Document proxyDefault = xmlUtils.readXML(SOAP2API_PROXY_TEMPLATE);
+        Document proxyDefault = xmlUtils.readXML( getTemplate(SOAP2API_PROXY_TEMPLATE) );
         Node basePathNode = proxyDefault.getElementsByTagName("BasePath").item(0);
 
         if (basePath != null && basePath.equalsIgnoreCase("") != true) {
@@ -389,25 +420,26 @@ public class GenerateProxy {
         Document apiTemplateDocument = xmlUtils
             .readXML(buildFolder + File.separator + "apiproxy" + File.separator + proxyName + ".xml");
 
-        Document extractTemplate = xmlUtils.readXML(SOAP2API_EXTRACT_TEMPLATE);
+        Document extractTemplate = xmlUtils.readXML( getTemplate(SOAP2API_EXTRACT_TEMPLATE) );
 
-        Document assignTemplate = xmlUtils.readXML(SOAP2API_ASSIGN_TEMPLATE);
+        Document assignTemplate = xmlUtils.readXML( getTemplate(SOAP2API_ASSIGN_TEMPLATE) );
 
-        Document returnOASTemplate = xmlUtils.readXML(SOAP2API_RETURN_OPENAPI_TEMPLATE);
+        Document returnOASTemplate = xmlUtils.readXML( getTemplate(SOAP2API_RETURN_OPENAPI_TEMPLATE) );
+
+
 
         // Document jsPolicyTemplate =
         // xmlUtils.readXML(SOAP2API_JSPOLICY_TEMPLATE);
 
         Document addNamespaceTemplate = null;
         if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-            addNamespaceTemplate = xmlUtils.readXML(SOAP2API_XSLT11POLICY_TEMPLATE);
+            addNamespaceTemplate = xmlUtils.readXML( getTemplate(SOAP2API_XSLT11POLICY_TEMPLATE) );
         } else {
-            addNamespaceTemplate = xmlUtils.readXML(SOAP2API_XSLT12POLICY_TEMPLATE);
+            addNamespaceTemplate = xmlUtils.readXML( getTemplate(SOAP2API_XSLT12POLICY_TEMPLATE) );
         }
 
-        Document jsonXMLTemplate = xmlUtils.readXML(SOAP2API_JSON_TO_XML_TEMPLATE);
-
-        Document addSoapActionTemplate = xmlUtils.readXML(SOAP2API_ADD_SOAPACTION_TEMPLATE);
+        Document jsonXMLTemplate = xmlUtils.readXML( getTemplate(SOAP2API_JSON_TO_XML_TEMPLATE) );
+        Document addSoapActionTemplate = xmlUtils.readXML( getTemplate(SOAP2API_ADD_SOAPACTION_TEMPLATE) );
 
         Node description = proxyDefault.getElementsByTagName("Description").item(0);
         description.setTextContent(proxyDescription);
@@ -424,6 +456,36 @@ public class GenerateProxy {
         Node step1, step2, step3, step4, step5;
         Node name1, name2, name3, name4, name5;
         boolean once = false;
+
+        // add basic policies if set
+        if (BASIC) {
+            String basicPolicy = "basic-auth-decoding";
+            String remoOAuthPolicy = "remove-header-authorization";
+
+            Node policy1 = apiTemplateDocument.createElement("Policy");
+            policy1.setTextContent(basicPolicy);
+
+            Node policy2 = apiTemplateDocument.createElement("Policy");
+            policy2.setTextContent(remoOAuthPolicy);
+
+            Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
+
+            step1 = proxyDefault.createElement("Step");
+            name1 = proxyDefault.createElement("Name");
+            name1.setTextContent(basicPolicy);
+            step1.appendChild(name1);
+
+            step2 = proxyDefault.createElement("Step");
+            name2 = proxyDefault.createElement("Name");
+            name2.setTextContent(remoOAuthPolicy);
+            step2.appendChild(name2);
+
+            preFlowRequest.appendChild(step1);
+            preFlowRequest.appendChild(step2);
+
+            policies.appendChild(policy1);
+            policies.appendChild(policy2);
+        }
 
         // add oauth policies if set
         if (OAUTH) {
@@ -555,6 +617,34 @@ public class GenerateProxy {
             flow.appendChild(condition);
 
             flows.appendChild(flow);
+        }
+
+        if (HEADER){
+            String jsPolicy = "extract-soap-header-variables";
+            Node policy1 = apiTemplateDocument.createElement("Policy");
+            policy1.setTextContent(jsPolicy);
+
+            policies.appendChild(policy1);
+            Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
+
+            step1 = proxyDefault.createElement("Step");
+            name1 = proxyDefault.createElement("Name");
+            name1.setTextContent(jsPolicy);
+            step1.appendChild(name1);
+
+            preFlowRequest.appendChild(step1);
+
+            String xsltPolicy = "add-soap-header";
+            Node policy2 = apiTemplateDocument.createElement("Policy");
+            policy2.setTextContent(xsltPolicy);
+            Node postFlowRequest = proxyDefault.getElementsByTagName("PostFlow").item(0).getChildNodes().item(1);
+
+            step1 = proxyDefault.createElement("Step");
+            name1 = proxyDefault.createElement("Name");
+            name1.setTextContent(xsltPolicy);
+            step1.appendChild(name1);
+
+            postFlowRequest.appendChild(step1);
         }
 
         // open-api feature
@@ -1161,6 +1251,19 @@ public class GenerateProxy {
         }.getClass().getEnclosingMethod().getName());
     }
 
+    private InputStream getSourceStream( String sourcePath, String fileName) throws FileNotFoundException {
+        if (templateFolder != null){
+            if (!templateFolder.endsWith(File.separator)){
+                templateFolder += File.separator;
+            }
+            File file = new File(templateFolder + sourcePath + fileName);
+            if (file.exists()) {
+                return new FileInputStream(file);
+            }
+        }
+        return getClass().getResourceAsStream( "/templates/" + sourcePath + fileName);
+    }
+
     private void writeStdPolicies() throws Exception {
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
@@ -1170,34 +1273,54 @@ public class GenerateProxy {
                 + File.separator;
             String xslResourcePath = buildFolder + File.separator + "apiproxy" + File.separator + "resources"
                 + File.separator + "xsl" + File.separator;
-            /*
-             * String jsResourcePath = buildFolder + File.separator + "apiproxy"
-             * + File.separator + "resources" + File.separator + "jsc" +
-             * File.separator;
-             */
+            String jsResourcePath = buildFolder + File.separator + "apiproxy" + File.separator + "resources"
+                    + File.separator + "jsc" + File.separator;
 
-            LOGGER.fine("Source Path: " + sourcePath);
+            LOGGER.fine("Source Path: " + templateFolder!= null? templateFolder : sourcePath );
             LOGGER.fine("Target Path: " + targetPath);
             if (PASSTHRU) {
-                sourcePath += "soappassthru/";
-                Files.copy(getClass().getResourceAsStream(sourcePath + "Extract-Operation-Name.xml"),
+                sourcePath = "soappassthru/";
+                Files.copy( getSourceStream(sourcePath, "Extract-Operation-Name.xml"),
                     Paths.get(targetPath + "Extract-Operation-Name.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "Invalid-SOAP.xml"),
+                Files.copy(getSourceStream(sourcePath,"Invalid-SOAP.xml"),
                     Paths.get(targetPath + "Invalid-SOAP.xml"), StandardCopyOption.REPLACE_EXISTING);
+
                 if (OAUTH) {
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "verify-oauth-v2-access-token.xml"),
+                    Files.copy(getSourceStream(sourcePath,"verify-oauth-v2-access-token.xml"),
                         Paths.get(targetPath + "verify-oauth-v2-access-token.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "remove-header-authorization.xml"),
+                    Files.copy(getSourceStream(sourcePath, "remove-header-authorization.xml"),
                         Paths.get(targetPath + "remove-header-authorization.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
                     if (QUOTAOAUTH) {
-                        Files.copy(getClass().getResourceAsStream(sourcePath + "impose-quota-oauth.xml"),
+                        Files.copy(getSourceStream(sourcePath, "impose-quota-oauth.xml"),
                             Paths.get(targetPath + "impose-quota-oauth.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
                     }
                 }
+
+                if (BASIC) {
+                    Files.copy(getSourceStream(sourcePath,"basic-auth-decoding.xml"),
+                            Paths.get(targetPath + "basic-auth-decoding.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "remove-header-authorization.xml"),
+                            Paths.get(targetPath + "remove-header-authorization.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                if (HEADER) {
+                    Files.copy(getSourceStream(sourcePath,"extract-soap-header-variables.xml"),
+                            Paths.get(targetPath + "extract-soap-header-variables.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "extract-soap-header-variables.js"),
+                            Paths.get(jsResourcePath + "extract-soap-header-variables.js"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "add-soap-header.xml"),
+                            Paths.get(targetPath + "add-soap-header.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
+
                 /*
                  * Files.copy(getClass().getResourceAsStream(sourcePath +
                  * "Return-WSDL.xml"), Paths.get(targetPath +
@@ -1205,49 +1328,49 @@ public class GenerateProxy {
                  * java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                  */
             } else {
-                sourcePath += "soap2api/";
-                Files.copy(getClass().getResourceAsStream(sourcePath + "xml-to-json.xml"),
+                sourcePath = "soap2api/";
+                Files.copy( getSourceStream(sourcePath, "xml-to-json.xml"),
                     Paths.get(targetPath + "xml-to-json.xml"), StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "set-response-soap-body.xml"),
-                    Paths.get(targetPath + "set-response-soap-body.xml"),
+                Files.copy(getSourceStream(sourcePath, "set-response-soap-body.xml"),
+                    Paths.get(targetPath, "set-response-soap-body.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "set-response-soap-body-accept.xml"),
+                Files.copy(getSourceStream(sourcePath, "set-response-soap-body-accept.xml"),
                     Paths.get(targetPath + "set-response-soap-body-accept.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "get-response-soap-body.xml"),
+                Files.copy(getSourceStream(sourcePath, "get-response-soap-body.xml"),
                     Paths.get(targetPath + "get-response-soap-body.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "get-response-soap-body-xml.xml"),
+                Files.copy(getSourceStream(sourcePath, "get-response-soap-body-xml.xml"),
                     Paths.get(targetPath + "get-response-soap-body-xml.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "set-target-url.xml"),
+                Files.copy(getSourceStream(sourcePath, "set-target-url.xml"),
                     Paths.get(targetPath + "set-target-url.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "extract-format.xml"),
+                Files.copy(getSourceStream(sourcePath, "extract-format.xml"),
                     Paths.get(targetPath + "extract-format.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "unknown-resource.xml"),
+                Files.copy(getSourceStream(sourcePath, "unknown-resource.xml"),
                     Paths.get(targetPath + "unknown-resource.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "unknown-resource-xml.xml"),
+                Files.copy(getSourceStream(sourcePath,"unknown-resource-xml.xml"),
                     Paths.get(targetPath + "unknown-resource-xml.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "remove-empty-nodes.xml"),
+                Files.copy(getSourceStream(sourcePath, "remove-empty-nodes.xml"),
                     Paths.get(targetPath + "remove-empty-nodes.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "remove-empty-nodes.xslt"),
+                Files.copy(getSourceStream(sourcePath, "remove-empty-nodes.xslt"),
                     Paths.get(xslResourcePath + "remove-empty-nodes.xslt"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "return-generic-error.xml"),
+                Files.copy(getSourceStream(sourcePath, "return-generic-error.xml"),
                     Paths.get(targetPath + "return-generic-error.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "return-generic-error-accept.xml"),
+                Files.copy(getSourceStream(sourcePath, "return-generic-error-accept.xml"),
                     Paths.get(targetPath + "return-generic-error-accept.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "remove-namespaces.xml"),
+                Files.copy(getSourceStream(sourcePath, "remove-namespaces.xml"),
                     Paths.get(targetPath + "remove-namespaces.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(getClass().getResourceAsStream(sourcePath + "remove-namespaces.xslt"),
+                Files.copy(getSourceStream(sourcePath, "remove-namespaces.xslt"),
                     Paths.get(xslResourcePath + "remove-namespaces.xslt"),
                     StandardCopyOption.REPLACE_EXISTING);
                 /*
@@ -1258,35 +1381,59 @@ public class GenerateProxy {
                  */
 
                 if (OAUTH) {
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "verify-oauth-v2-access-token.xml"),
+                    Files.copy(getSourceStream(sourcePath, "verify-oauth-v2-access-token.xml"),
                         Paths.get(targetPath + "verify-oauth-v2-access-token.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "remove-header-authorization.xml"),
+                    Files.copy(getSourceStream(sourcePath, "remove-header-authorization.xml"),
                         Paths.get(targetPath + "remove-header-authorization.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
                     if (QUOTAOAUTH) {
-                        Files.copy(getClass().getResourceAsStream(sourcePath + "impose-quota-oauth.xml"),
+                        Files.copy(getSourceStream(sourcePath, "impose-quota-oauth.xml"),
                             Paths.get(targetPath + "impose-quota-oauth.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
                     }
                 }
 
+                if (BASIC) {
+                    Files.copy(getSourceStream(sourcePath, "basic-auth-decoding.xml"),
+                            Paths.get(targetPath + "basic-auth-decoding.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "remove-header-authorization.xml"),
+                            Paths.get(targetPath + "remove-header-authorization.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                if (HEADER) {
+                    Files.copy(getSourceStream(sourcePath,"extract-soap-header-variables.xml"),
+                            Paths.get(targetPath + "extract-soap-header-variables.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "extract-soap-header-variables.js"),
+                            Paths.get(jsResourcePath + "extract-soap-header-variables.js"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "add-soap-header.xml"),
+                            Paths.get(targetPath + "add-soap-header.xml"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(getSourceStream(sourcePath, "add-soap-header.xslt"),
+                            Paths.get(xslResourcePath + "add-soap-header.xslt"),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
+
                 if (APIKEY) {
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "verify-api-key.xml"),
+                    Files.copy(getSourceStream(sourcePath, "verify-api-key.xml"),
                         Paths.get(targetPath + "verify-api-key.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "remove-query-param-apikey.xml"),
+                    Files.copy(getSourceStream(sourcePath, "remove-query-param-apikey.xml"),
                         Paths.get(targetPath + "remove-query-param-apikey.xml"),
                         StandardCopyOption.REPLACE_EXISTING);
                     if (QUOTAAPIKEY) {
-                        Files.copy(getClass().getResourceAsStream(sourcePath + "impose-quota-apikey.xml"),
+                        Files.copy(getSourceStream(sourcePath, "impose-quota-apikey.xml"),
                             Paths.get(targetPath + "impose-quota-apikey.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
                     }
                 }
 
                 if (CORS) {
-                    Files.copy(getClass().getResourceAsStream(sourcePath + "add-cors.xml"),
+                    Files.copy(getSourceStream(sourcePath, "add-cors.xml"),
                         Paths.get(targetPath + "add-cors.xml"), StandardCopyOption.REPLACE_EXISTING);
                 }
             }
@@ -1315,10 +1462,10 @@ public class GenerateProxy {
             basePathNode.setTextContent(basePath);
         }
 
+        Node policies = proxyDefault.getElementsByTagName("Policies").item(0);
+
         // add oauth policies if set
         if (OAUTH) {
-
-            Node policies = proxyDefault.getElementsByTagName("Policies").item(0);
 
             String oauthPolicy = "verify-oauth-v2-access-token";
             String remoOAuthPolicy = "remove-header-authorization";
@@ -1348,6 +1495,27 @@ public class GenerateProxy {
                 step3.appendChild(name3);
                 preFlowRequest.appendChild(step3);
             }
+        }
+
+        if (BASIC) {
+            String basicPolicy = "basic-auth-decoding";
+            String remoOAuthPolicy = "remove-header-authorization";
+
+            Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
+
+            Node step1 = proxyDefault.createElement("Step");
+            Node name1 = proxyDefault.createElement("Name");
+            name1.setTextContent(basicPolicy);
+            step1.appendChild(name1);
+
+            Node step2 = proxyDefault.createElement("Step");
+            Node name2 = proxyDefault.createElement("Name");
+            name2.setTextContent(remoOAuthPolicy);
+            step2.appendChild(name2);
+
+            preFlowRequest.insertBefore(step1, preFlowRequest.getFirstChild());
+            preFlowRequest.appendChild(step2);
+
         }
 
         Node httpProxyConnection = proxyDefault.getElementsByTagName("HTTPProxyConnection").item(0);
@@ -2217,7 +2385,7 @@ public class GenerateProxy {
         namespace = (Map<String, String>) op.getNamespaceContext();
 
         try {
-            if (verb.equalsIgnoreCase("GET")) {
+            if ( verb.equalsIgnoreCase("GET") ) {
 
                 soapRequest = buildSOAPRequest(op.getInput().getMessage().getParts(), wsdl.getSchemas(), op.getName(),
                     op.getNamespaceUri(), true);
@@ -2236,10 +2404,10 @@ public class GenerateProxy {
                 String prefix = getPrefix(namespaceUri);
 
                 if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                    xmlUtils.generateRootNamespaceXSLT(SOAP2API_XSLT11_TEMPLATE, SOAP2API_XSL, op.getName(), prefix,
+                    xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT11_TEMPLATE), SOAP2API_XSL, op.getName(), prefix,
                         null, namespaceUri, namespace);
                 } else {
-                    xmlUtils.generateRootNamespaceXSLT(SOAP2API_XSLT12_TEMPLATE, SOAP2API_XSL, op.getName(), prefix,
+                    xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT12_TEMPLATE), SOAP2API_XSL, op.getName(), prefix,
                         null, namespaceUri, namespace);
                 }
 
@@ -2603,18 +2771,12 @@ public class GenerateProxy {
                                     }
                                     String prefix = getPrefix(namespaceUri);
 
-                                    if ( xsltTemplate != null ){
-                                        xmlUtils.generateRootNamespaceXSLT(xsltTemplate, SOAP2API_XSL,
-                                                op.getName(), prefix, requestElement.getName(), namespaceUri,
-                                                namespace);
-                                    }
-                                    else
                                     if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                                        xmlUtils.generateRootNamespaceXSLT(SOAP2API_XSLT11_TEMPLATE, SOAP2API_XSL,
+                                        xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT11_TEMPLATE), SOAP2API_XSL,
                                             op.getName(), prefix, requestElement.getName(), namespaceUri,
                                             namespace);
                                     } else {
-                                        xmlUtils.generateRootNamespaceXSLT(SOAP2API_XSLT12_TEMPLATE, SOAP2API_XSL,
+                                        xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT12_TEMPLATE), SOAP2API_XSL,
                                             op.getName(), prefix, requestElement.getName(), namespaceUri,
                                             namespace);
                                     }
@@ -2909,6 +3071,9 @@ public class GenerateProxy {
                 }
 
                 LOGGER.info("Base Path: " + basePath + "\nWSDL Path: " + wsdlPath);
+                if ( templateFolder != null ) {
+                    LOGGER.info("Template folder: " + templateFolder );
+                }
                 LOGGER.info("Build Folder: " + buildFolder + "\nSOAP Version: " + soapVersion);
                 LOGGER.info("Proxy Name: " + proxyName + "\nProxy Description: " + proxyDescription);
 
@@ -2982,9 +3147,11 @@ public class GenerateProxy {
         System.out.println("-opsmap=opsmapping.xml    mapping file that to map wsdl operation to http verb");
         System.out.println("-allpost=<true|false>     set to true if all operations are http verb; default is false");
         System.out.println("-vhosts=<comma separated values for virtuals hosts>");
-        System.out.println("-template=path to custom XSLT template");
+        System.out.println("-templates=<custom template folder>");
         System.out.println("-build=specify build folder   default is temp/tmp");
         System.out.println("-oauth=<true|false>       default is false");
+        System.out.println("-basic=<true|false>       basic authentication, default is false");
+        System.out.println("-header=<true|false>      SOAP header generation, default is false");
         System.out.println("-apikey=<true|false>      default is false");
         System.out.println("-quota=<true|false>       default is false; works only if apikey or oauth is set");
         System.out.println("-basepath=specify base path");
@@ -3094,12 +3261,16 @@ public class GenerateProxy {
         opt.getSet().addOption("build", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // add verify oauth policy
         opt.getSet().addOption("oauth", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // add verify basic policy
+        opt.getSet().addOption("basic", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // add verify apikey policy
         opt.getSet().addOption("apikey", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // add impose quota policy
         opt.getSet().addOption("quota", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
-        // set custom template for XSLT
-        opt.getSet().addOption("template", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // set custom template folder
+        opt.getSet().addOption("templates", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // add SOAP header step
+        opt.getSet().addOption("header", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set basepath
         opt.getSet().addOption("basepath", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set target backend url
@@ -3187,8 +3358,12 @@ public class GenerateProxy {
             genProxy.setCORS(new Boolean(opt.getSet().getOption("cors").getResultValue(0)));
         }
 
-        if (opt.getSet().isSet("template")) {
-            genProxy.setTemplate(opt.getSet().getOption("template").getResultValue(0));
+        if (opt.getSet().isSet("templates")) {
+            genProxy.setTemplateFolder(opt.getSet().getOption("templates").getResultValue(0));
+        }
+
+        if (opt.getSet().isSet("header")) {
+            genProxy.setHeader(new Boolean(opt.getSet().getOption("header").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("oauth")) {
@@ -3197,6 +3372,11 @@ public class GenerateProxy {
                 genProxy.setQuotaOAuth(new Boolean(opt.getSet().getOption("quota").getResultValue(0)));
             }
         }
+        else
+        if (opt.getSet().isSet("basic")) {
+            genProxy.setBasic(new Boolean(opt.getSet().getOption("basic").getResultValue(0)));
+        }
+
         if (opt.getSet().isSet("backendurlvalidation")) {
             genProxy.setBackendUrlValidation(new Boolean(opt.getSet().getOption("backendurlvalidation").getResultValue(0)));
         }
@@ -3238,6 +3418,9 @@ public class GenerateProxy {
         genProxy.setCORS(generateProxyOptions.isCors());
         genProxy.setAPIKey(generateProxyOptions.isApiKey());
         genProxy.setOAuth(generateProxyOptions.isOauth());
+        genProxy.setBasic(generateProxyOptions.isBasic() && !generateProxyOptions.isOauth());
+        genProxy.setHeader(generateProxyOptions.isHeader());
+        genProxy.setTemplateFolder( generateProxyOptions.getTemplateFolder() );
         genProxy.setQuotaAPIKey(generateProxyOptions.isApiKey() && generateProxyOptions.isQuota());
         genProxy.setQuotaOAuth(generateProxyOptions.isOauth() && generateProxyOptions.isQuota());
         if (generateProxyOptions.getOperationsFilter() != null

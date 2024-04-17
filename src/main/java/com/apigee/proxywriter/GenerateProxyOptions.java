@@ -6,15 +6,20 @@ public class GenerateProxyOptions {
     private final boolean passthrough;
     private final String description;
     private final String basepath;
+    private final String templateFolder;
     private final String vHosts;
     private final boolean cors;
     private final boolean apiKey;
+    private final boolean basic;
+    private final boolean header;
+
     private final boolean oauth;
     private final boolean quota;
     private final String operationsFilter;
 
     public GenerateProxyOptions(String wsdl, String port, boolean passthrough, String description, String basepath,
-                String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota, String operationsFilter) {
+                String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota, boolean basic,
+                                String operationsFilter, String templateFolder, boolean header) {
         this.wsdl = wsdl;
         this.port = port;
         this.passthrough = passthrough;
@@ -24,6 +29,9 @@ public class GenerateProxyOptions {
         this.cors = cors;
         this.apiKey = apiKey;
         this.oauth = oauth;
+        this.basic = basic;
+        this.header = header;
+        this.templateFolder = templateFolder;
         this.quota = quota;
         this.operationsFilter = operationsFilter;
     }
@@ -70,5 +78,17 @@ public class GenerateProxyOptions {
 
     public String getOperationsFilter() {
         return operationsFilter;
+    }
+
+    public String getTemplateFolder() {
+        return templateFolder;
+    }
+
+    public boolean isBasic() {
+        return basic;
+    }
+
+    public boolean isHeader() {
+        return header;
     }
 }

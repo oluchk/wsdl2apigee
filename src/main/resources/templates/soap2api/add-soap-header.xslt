@@ -7,6 +7,7 @@
   <xsl:param name="password" />
   <xsl:param name="messageId" />
   <xsl:param name="timestamp" />
+  <xsl:param name="action" />
 
 
   <xsl:template match="/">

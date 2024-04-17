@@ -108,7 +108,6 @@ public class GenerateProxy {
     private static final String SOAP2API_XSLT12POLICY_TEMPLATE = "/templates/soap2api/add-namespace12.xml";
     private static final String SOAP2API_XSLT12_TEMPLATE = "/templates/soap2api/add-namespace12.xslt";
     private static final String SOAP2API_JSON_TO_XML_TEMPLATE = "/templates/soap2api/json-to-xml.xml";
-    private static final String SOAP2API_XSLT_HEADER_TEMPLATE = "/templates/soap2api/add-soap-header.xslt";
     private static final String SOAP2API_ADD_SOAPACTION_TEMPLATE = "/templates/soap2api/add-soapaction.xml";
     // open-api feature
     private static final String SOAP2API_RETURN_OPENAPI_TEMPLATE = "/templates/soap2api/return-open-api.xml";
@@ -453,8 +452,8 @@ public class GenerateProxy {
         Node request;
         Node response;
         Node condition, condition2;
-        Node step1, step2, step3, step4, step5;
-        Node name1, name2, name3, name4, name5;
+        Node step1, step2, step3, step4, step5, step6;
+        Node name1, name2, name3, name4, name5, name6;
         boolean once = false;
 
         // add basic policies if set
@@ -675,6 +674,7 @@ public class GenerateProxy {
             String buildSOAPPolicy = operationName + "-build-soap";
             String extractPolicyName = operationName + "-extract-query-param";
             String jsonToXML = operationName + "-json-to-xml";
+
             // String jsPolicyName = operationName + "-root-wrapper";
             String jsonToXMLCondition = "(request.header.Content-Type == \"application/json\")";
 
@@ -682,6 +682,7 @@ public class GenerateProxy {
             String resourcePath = apiMap.getResourcePath();
             String Condition = "(proxy.pathsuffix MatchesPath \"" + resourcePath + "\") and (request.verb = \""
                 + httpVerb + "\")";
+            //TODO  case-insensitive mode ~~ "(?i)resourcePath"
             String addSoapAction = operationName + "-add-soapaction";
 
             flow = proxyDefault.createElement("Flow");
@@ -711,6 +712,9 @@ public class GenerateProxy {
 
             step5 = proxyDefault.createElement("Step");
             name5 = proxyDefault.createElement("Name");
+
+            step6 = proxyDefault.createElement("Step");
+            name6 = proxyDefault.createElement("Name");
 
             if (httpVerb.equalsIgnoreCase("get")) {
                 if (apiMap.getJsonBody() != null) {
@@ -772,6 +776,7 @@ public class GenerateProxy {
                     request.appendChild(step4);
                 }
 
+
                 // for soap 1.1 add soap action
                 if (soapVersion.equalsIgnoreCase(SOAP_11)) {
                     step5 = proxyDefault.createElement("Step");
@@ -781,6 +786,13 @@ public class GenerateProxy {
                     request.appendChild(step5);
                 }
 
+                if (HEADER) {
+                    step6 = proxyDefault.createElement("Step");
+                    name6 = proxyDefault.createElement("Name");
+                    name6.setTextContent(operationName + "-assign-message");
+                    step6.appendChild(name6);
+                    request.appendChild(step6);
+                }
             }
 
             LOGGER.fine("Condition: " + Condition);
@@ -805,8 +817,15 @@ public class GenerateProxy {
                 policy2.setTextContent(buildSOAPPolicy);
                 policies.appendChild(policy2);
                 // write Assign Message Policy
-                writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName, buildSOAPPolicy,
-                    apiMap.getSoapAction());
+
+                String payloadType = SOAP12_PAYLOAD_TYPE;
+                if (soapVersion.equalsIgnoreCase(SOAP_11)) {
+                    payloadType = SOAP11_PAYLOAD_TYPE;
+                }
+                writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
+                        operationName + "-build-soap",
+                        operationName + " Build SOAP",
+                     apiMap.getSoapAction(), payloadType);
             } else {
 
                 /*
@@ -852,6 +871,13 @@ public class GenerateProxy {
                     policy5.setTextContent(addSoapAction);
                     policies.appendChild(policy5);
                     writeAddSoapAction(addSoapActionTemplate, operationName, apiMap.getSoapAction());
+                }
+
+                if (HEADER) {
+                    writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
+                            operationName + "-assign-message",
+                            operationName + " Assign Message",
+                            apiMap.getSoapAction(), null);
                 }
             }
         }
@@ -1108,8 +1134,9 @@ public class GenerateProxy {
         }
     }
 
-    private void writeSOAP2APIAssignMessagePolicies(Document assignTemplate, String operationName, String policyName,
-                                                    String soapAction) throws Exception {
+    private void writeSOAP2APIAssignMessagePolicies(Document assignTemplate, String operationName,
+                                                    String policyName, String policyDisplayName,
+                                                    String soapAction, String payloadType) throws Exception {
 
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
@@ -1123,58 +1150,83 @@ public class GenerateProxy {
         nodeAttr.setNodeValue(policyName);
 
         Node displayName = assignPolicyXML.getElementsByTagName("DisplayName").item(0);
-        displayName.setTextContent(operationName + " Build SOAP");
+        displayName.setTextContent(policyDisplayName);
 
         Node payload = assignPolicyXML.getElementsByTagName("Payload").item(0);
-        NamedNodeMap payloadNodeMap = payload.getAttributes();
-        Node payloadAttr = payloadNodeMap.getNamedItem("contentType");
-
-        if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-            payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(SOAP11_PAYLOAD_TYPE));
-
-            assignPolicyXML.getElementsByTagName("Header").item(1)
-                .setTextContent(StringEscapeUtils.escapeXml10(SOAP11_CONTENT_TYPE));
-
-            if (soapAction != null) {
-                Node header = assignPolicyXML.getElementsByTagName("Header").item(0);
-                header.setTextContent(soapAction);
-            } else {
-                final Node add = assignPolicyXML.getElementsByTagName("Add").item(0);
-                add.getParentNode().removeChild(add);
-            }
-        } else {
-            payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(SOAP12_PAYLOAD_TYPE));
-
-            assignPolicyXML.getElementsByTagName("Header").item(1)
-                .setTextContent(StringEscapeUtils.escapeXml10(SOAP12_CONTENT_TYPE));
-        }
-
-        APIMap apiMap = messageTemplates.get(operationName);
-        Document operationPayload = null;
-        // edgeui-654 (check for getBytes().length
-        if (xmlUtils.isValidXML(apiMap.getSoapBody()) && apiMap.getSoapBody().getBytes().length < 4096) {
-            // JIRA-EDGEUI-672
-            operationPayload = xmlUtils.getXMLFromString(replaceReservedVariables(apiMap.getSoapBody()));
-        } else {
-            LOGGER.warning("Operation " + operationName + " soap template could not be generated");
+        if ( payloadType != null ){
+            NamedNodeMap payloadNodeMap = payload.getAttributes();
+            Node payloadAttr = payloadNodeMap.getNamedItem("contentType");
+            payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(payloadType));
             if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                operationPayload = xmlUtils.getXMLFromString(emptySoap11);
+                assignPolicyXML.getElementsByTagName("Header").item(1)
+                        .setTextContent(StringEscapeUtils.escapeXml10(SOAP11_CONTENT_TYPE));
+                if (soapAction != null) {
+                    Node header = assignPolicyXML.getElementsByTagName("Header").item(0);
+                    header.setTextContent(soapAction);
+                } else {
+                    final Node add = assignPolicyXML.getElementsByTagName("Add").item(0);
+                    add.getParentNode().removeChild(add);
+                }
             } else {
-                operationPayload = xmlUtils.getXMLFromString(emptySoap12);
+                assignPolicyXML.getElementsByTagName("Header").item(1)
+                        .setTextContent(StringEscapeUtils.escapeXml10(SOAP12_CONTENT_TYPE));
             }
+
+            APIMap apiMap = messageTemplates.get(operationName);
+            Document operationPayload = null;
+            // edgeui-654 (check for getBytes().length
+            if (xmlUtils.isValidXML(apiMap.getSoapBody()) && apiMap.getSoapBody().getBytes().length < 4096) {
+                // JIRA-EDGEUI-672
+                operationPayload = xmlUtils.getXMLFromString(replaceReservedVariables(apiMap.getSoapBody()));
+            } else {
+                LOGGER.warning("Operation " + operationName + " soap template could not be generated");
+                if (soapVersion.equalsIgnoreCase(SOAP_11)) {
+                    operationPayload = xmlUtils.getXMLFromString(emptySoap11);
+                } else {
+                    operationPayload = xmlUtils.getXMLFromString(emptySoap12);
+                }
+            }
+            Node importedNode = assignPolicyXML.importNode(operationPayload.getDocumentElement(), true);
+            payload.appendChild(importedNode);
+        }
+        else
+        {
+            Node set = assignPolicyXML.getElementsByTagName("Set").item(0);
+            set.getParentNode().removeChild(set);
         }
 
-        Node importedNode = assignPolicyXML.importNode(operationPayload.getDocumentElement(), true);
-        payload.appendChild(importedNode);
+        Node targetEndpointValue = assignPolicyXML.getElementsByTagName("Value").item(0);
+        targetEndpointValue.setTextContent(targetEndpoint);
 
-        Node value = assignPolicyXML.getElementsByTagName("Value").item(0);
-        value.setTextContent(targetEndpoint);
+        if (HEADER) {
+            Node assignMessage = assignPolicyXML.getElementsByTagName("AssignMessage").item(0);
+            Node assignVariable1 = assignPolicyXML.createElement("AssignVariable");
+            Node assignVariable2 = assignPolicyXML.createElement("AssignVariable");
+
+            Node actionName = assignPolicyXML.createElement("Name");
+            actionName.setTextContent("soap.operation");
+            Node actionValue = assignPolicyXML.createElement("Value");
+            actionValue.setTextContent(operationName);
+
+            assignVariable1.appendChild(actionName);
+            assignVariable1.appendChild(actionValue);
+            assignMessage.appendChild(assignVariable1);
+
+            actionName = assignPolicyXML.createElement("Name");
+            actionName.setTextContent("soap.action");
+            actionValue = assignPolicyXML.createElement("Value");
+            actionValue.setTextContent(soapAction);
+
+            assignVariable2.appendChild(actionName);
+            assignVariable2.appendChild(actionValue);
+            assignMessage.appendChild(assignVariable2);
+        }
 
         LOGGER.fine("Generated resource xml: " + buildFolder + File.separator + "apiproxy" + File.separator + "policies"
-            + File.separator + policyName + ".xml");
+                + File.separator + policyName + ".xml");
 
         xmlUtils.writeXML(assignPolicyXML, buildFolder + File.separator + "apiproxy" + File.separator + "policies"
-            + File.separator + policyName + ".xml");
+                + File.separator + policyName + ".xml");
 
         LOGGER.exiting(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
@@ -3335,7 +3387,7 @@ public class GenerateProxy {
         }
 
         if (opt.getSet().isSet("allpost")) {
-            genProxy.setAllPost(new Boolean(opt.getSet().getOption("allpost").getResultValue(0)));
+            genProxy.setAllPost(Boolean.valueOf(opt.getSet().getOption("allpost").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("vhosts")) {
@@ -3355,7 +3407,7 @@ public class GenerateProxy {
         }
 
         if (opt.getSet().isSet("cors")) {
-            genProxy.setCORS(new Boolean(opt.getSet().getOption("cors").getResultValue(0)));
+            genProxy.setCORS(Boolean.valueOf(opt.getSet().getOption("cors").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("templates")) {
@@ -3363,27 +3415,27 @@ public class GenerateProxy {
         }
 
         if (opt.getSet().isSet("header")) {
-            genProxy.setHeader(new Boolean(opt.getSet().getOption("header").getResultValue(0)));
+            genProxy.setHeader(Boolean.valueOf(opt.getSet().getOption("header").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("oauth")) {
-            genProxy.setOAuth(new Boolean(opt.getSet().getOption("oauth").getResultValue(0)));
+            genProxy.setOAuth(Boolean.valueOf(opt.getSet().getOption("oauth").getResultValue(0)));
             if (opt.getSet().isSet("quota")) {
-                genProxy.setQuotaOAuth(new Boolean(opt.getSet().getOption("quota").getResultValue(0)));
+                genProxy.setQuotaOAuth(Boolean.valueOf(opt.getSet().getOption("quota").getResultValue(0)));
             }
         }
         else
         if (opt.getSet().isSet("basic")) {
-            genProxy.setBasic(new Boolean(opt.getSet().getOption("basic").getResultValue(0)));
+            genProxy.setBasic(Boolean.valueOf(opt.getSet().getOption("basic").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("backendurlvalidation")) {
-            genProxy.setBackendUrlValidation(new Boolean(opt.getSet().getOption("backendurlvalidation").getResultValue(0)));
+            genProxy.setBackendUrlValidation(Boolean.valueOf(opt.getSet().getOption("backendurlvalidation").getResultValue(0)));
         }
         if (opt.getSet().isSet("apikey")) {
-            genProxy.setAPIKey(new Boolean(opt.getSet().getOption("apikey").getResultValue(0)));
+            genProxy.setAPIKey(Boolean.valueOf(opt.getSet().getOption("apikey").getResultValue(0)));
             if (opt.getSet().isSet("quota")) {
-                genProxy.setQuotaAPIKey(new Boolean(opt.getSet().getOption("quota").getResultValue(0)));
+                genProxy.setQuotaAPIKey(Boolean.valueOf(opt.getSet().getOption("quota").getResultValue(0)));
             }
         }
 

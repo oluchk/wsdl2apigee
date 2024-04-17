@@ -7,13 +7,7 @@
     <Parameters ignoreUnresolvedVariables="true">
         <Parameter name="username" ref="request.header.username"/>
         <Parameter name="password" ref="request.header.password"/>
-        <Parameter name="messageId" ref="messageId"/>
-        <Parameter name="correlationId" ref="correlationId"/>
-        <Parameter name="requestCorrelationId" ref="requestCorrelationId"/>
         <Parameter name="timestamp" ref="timestamp"/>
-        <Parameter name="to" ref="to"/>
-        <Parameter name="action" ref="action"/>
-        <Parameter name="address1" ref="address1"/>
-        <Parameter name="address2" ref="address2"/>
+        <Parameter name="action" ref="soap.action"/>
     </Parameters>
 </XSL>

@@ -138,9 +138,9 @@ public class GenerateProxy {
     // set this to true if oauth should be added to the proxy
     private boolean OAUTH;
     // set this to true if basic should be added to the proxy
-    private boolean BASIC;
+    private boolean BASIC_AUTH;
     // set this to true if SOAP header processing should be added to the proxy
-    private boolean HEADER;
+    private boolean SOAP_HEADER;
     // set this to true if apikey should be added to the proxy
     private boolean APIKEY;
     // enable this flag if api key based quota is enabled
@@ -244,8 +244,8 @@ public class GenerateProxy {
         ALLPOST = false;
         PASSTHRU = false;
         OAUTH = false;
-        BASIC = false;
-        HEADER = false;
+        BASIC_AUTH = false;
+        SOAP_HEADER = false;
         APIKEY = false;
         QUOTAAPIKEY = false;
         QUOTAOAUTH = false;
@@ -325,11 +325,11 @@ public class GenerateProxy {
     }
 
     public void setBasic(boolean basic) {
-        BASIC = basic;
+        BASIC_AUTH = basic;
     }
 
     public void setHeader(boolean header) {
-        HEADER = header;
+        SOAP_HEADER = header;
     }
 
     public void setTemplateFolder(String folder) { templateFolder = folder; }
@@ -452,12 +452,12 @@ public class GenerateProxy {
         Node request;
         Node response;
         Node condition, condition2;
-        Node step1, step2, step3, step4, step5, step6;
-        Node name1, name2, name3, name4, name5, name6;
+        Node step1, step2;
+        Node name1, name2;
         boolean once = false;
 
         // add basic policies if set
-        if (BASIC) {
+        if (BASIC_AUTH) {
             String basicPolicy = "basic-auth-decoding";
             String remoOAuthPolicy = "remove-header-authorization";
 
@@ -521,8 +521,9 @@ public class GenerateProxy {
                 Node policy3 = apiTemplateDocument.createElement("Policy");
                 policy2.setTextContent(quota);
                 policies.appendChild(policy3);
-                step3 = proxyDefault.createElement("Step");
-                name3 = proxyDefault.createElement("Name");
+
+                Element step3 = proxyDefault.createElement("Step");
+                Element name3 = proxyDefault.createElement("Name");
                 name3.setTextContent(quota);
                 step3.appendChild(name3);
                 preFlowRequest.appendChild(step3);
@@ -563,8 +564,9 @@ public class GenerateProxy {
                 Node policy3 = apiTemplateDocument.createElement("Policy");
                 policy2.setTextContent(quota);
                 policies.appendChild(policy3);
-                step3 = proxyDefault.createElement("Step");
-                name3 = proxyDefault.createElement("Name");
+
+                Element step3 = proxyDefault.createElement("Step");
+                Element name3 = proxyDefault.createElement("Name");
                 name3.setTextContent(quota);
                 step3.appendChild(name3);
                 preFlowRequest.appendChild(step3);
@@ -618,7 +620,7 @@ public class GenerateProxy {
             flows.appendChild(flow);
         }
 
-        if (HEADER){
+        if (SOAP_HEADER){
             String jsPolicy = "extract-soap-header-variables";
             Node policy1 = apiTemplateDocument.createElement("Policy");
             policy1.setTextContent(jsPolicy);
@@ -704,17 +706,6 @@ public class GenerateProxy {
             step2 = proxyDefault.createElement("Step");
             name2 = proxyDefault.createElement("Name");
 
-            step3 = proxyDefault.createElement("Step");
-            name3 = proxyDefault.createElement("Name");
-
-            step4 = proxyDefault.createElement("Step");
-            name4 = proxyDefault.createElement("Name");
-
-            step5 = proxyDefault.createElement("Step");
-            name5 = proxyDefault.createElement("Name");
-
-            step6 = proxyDefault.createElement("Step");
-            name6 = proxyDefault.createElement("Name");
 
             if (httpVerb.equalsIgnoreCase("get")) {
                 if (apiMap.getJsonBody() != null) {
@@ -730,8 +721,9 @@ public class GenerateProxy {
                 request.appendChild(step2);
 
                 if (apiMap.getJsonBody() != null) {
-                    step3 = proxyDefault.createElement("Step");
-                    name3 = proxyDefault.createElement("Name");
+                    Node step3 = proxyDefault.createElement("Step");
+                    Node name3 = proxyDefault.createElement("Name");
+
                     name3.setTextContent("remove-empty-nodes");
                     Node condition3 = proxyDefault.createElement("Condition");
                     condition3.setTextContent("(verb == \"GET\")");
@@ -771,6 +763,8 @@ public class GenerateProxy {
                 request.appendChild(step2);
 
                 if (apiMap.getOthernamespaces()) {
+                    Node step4 = proxyDefault.createElement("Step");
+                    Node name4 = proxyDefault.createElement("Name");
                     name4.setTextContent(operationName + "-add-other-namespaces");
                     step4.appendChild(name4);
                     request.appendChild(step4);
@@ -779,16 +773,16 @@ public class GenerateProxy {
 
                 // for soap 1.1 add soap action
                 if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                    step5 = proxyDefault.createElement("Step");
-                    name5 = proxyDefault.createElement("Name");
+                    Node step5 = proxyDefault.createElement("Step");
+                    Node name5 = proxyDefault.createElement("Name");
                     name5.setTextContent(addSoapAction);
                     step5.appendChild(name5);
                     request.appendChild(step5);
                 }
 
-                if (HEADER) {
-                    step6 = proxyDefault.createElement("Step");
-                    name6 = proxyDefault.createElement("Name");
+                if (SOAP_HEADER) {
+                    Node step6 = proxyDefault.createElement("Step");
+                    Node name6 = proxyDefault.createElement("Name");
                     name6.setTextContent(operationName + "-assign-message");
                     step6.appendChild(name6);
                     request.appendChild(step6);
@@ -873,7 +867,7 @@ public class GenerateProxy {
                     writeAddSoapAction(addSoapActionTemplate, operationName, apiMap.getSoapAction());
                 }
 
-                if (HEADER) {
+                if (SOAP_HEADER) {
                     writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
                             operationName + "-assign-message",
                             operationName + " Assign Message",
@@ -1198,7 +1192,7 @@ public class GenerateProxy {
         Node targetEndpointValue = assignPolicyXML.getElementsByTagName("Value").item(0);
         targetEndpointValue.setTextContent(targetEndpoint);
 
-        if (HEADER) {
+        if (SOAP_HEADER) {
             Node assignMessage = assignPolicyXML.getElementsByTagName("AssignMessage").item(0);
             Node assignVariable1 = assignPolicyXML.createElement("AssignVariable");
             Node assignVariable2 = assignPolicyXML.createElement("AssignVariable");
@@ -1352,7 +1346,7 @@ public class GenerateProxy {
                     }
                 }
 
-                if (BASIC) {
+                if (BASIC_AUTH) {
                     Files.copy(getSourceStream(sourcePath,"basic-auth-decoding.xml"),
                             Paths.get(targetPath + "basic-auth-decoding.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
@@ -1361,7 +1355,7 @@ public class GenerateProxy {
                             StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                if (HEADER) {
+                if (SOAP_HEADER) {
                     Files.copy(getSourceStream(sourcePath,"extract-soap-header-variables.xml"),
                             Paths.get(targetPath + "extract-soap-header-variables.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
@@ -1446,7 +1440,7 @@ public class GenerateProxy {
                     }
                 }
 
-                if (BASIC) {
+                if (BASIC_AUTH) {
                     Files.copy(getSourceStream(sourcePath, "basic-auth-decoding.xml"),
                             Paths.get(targetPath + "basic-auth-decoding.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
@@ -1455,7 +1449,7 @@ public class GenerateProxy {
                             StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                if (HEADER) {
+                if (SOAP_HEADER) {
                     Files.copy(getSourceStream(sourcePath,"extract-soap-header-variables.xml"),
                             Paths.get(targetPath + "extract-soap-header-variables.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
@@ -1549,7 +1543,7 @@ public class GenerateProxy {
             }
         }
 
-        if (BASIC) {
+        if (BASIC_AUTH) {
             String basicPolicy = "basic-auth-decoding";
             String remoOAuthPolicy = "remove-header-authorization";
 
@@ -1567,7 +1561,6 @@ public class GenerateProxy {
 
             preFlowRequest.insertBefore(step1, preFlowRequest.getFirstChild());
             preFlowRequest.appendChild(step2);
-
         }
 
         Node httpProxyConnection = proxyDefault.getElementsByTagName("HTTPProxyConnection").item(0);

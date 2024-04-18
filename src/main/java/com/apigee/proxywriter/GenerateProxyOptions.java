@@ -15,11 +15,12 @@ public class GenerateProxyOptions {
 
     private final boolean oauth;
     private final boolean quota;
+    private final boolean caseInsensitive;
     private final String operationsFilter;
 
     public GenerateProxyOptions(String wsdl, String port, boolean passthrough, String description, String basepath,
                 String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota, boolean basic,
-                                String operationsFilter, String templateFolder, boolean header) {
+                                String operationsFilter, String templateFolder, boolean header, boolean caseInsensitive) {
         this.wsdl = wsdl;
         this.port = port;
         this.passthrough = passthrough;
@@ -34,6 +35,7 @@ public class GenerateProxyOptions {
         this.templateFolder = templateFolder;
         this.quota = quota;
         this.operationsFilter = operationsFilter;
+        this.caseInsensitive = caseInsensitive;
     }
 
     public String getWsdl() {
@@ -90,5 +92,9 @@ public class GenerateProxyOptions {
 
     public boolean isHeader() {
         return header;
+    }
+
+    public boolean isCaseInsensitive() {
+        return caseInsensitive;
     }
 }

@@ -147,6 +147,8 @@ public class GenerateProxy {
     private boolean QUOTAAPIKEY;
     // enable this flag if oauth based quota is enabled
     private boolean QUOTAOAUTH;
+    // enable this flag if conditions should be case insensitive
+    private boolean CASE_INSENSITIVE_CONDITIONS;
     // enable this flag is cors is enabled
     private boolean CORS;
     // enable this flag if wsdl is of rpc style
@@ -250,6 +252,7 @@ public class GenerateProxy {
         QUOTAAPIKEY = false;
         QUOTAOAUTH = false;
         CORS = false;
+        CASE_INSENSITIVE_CONDITIONS = false;
         RPCSTYLE = false;
         DESCSET = false;
         basePath = null;
@@ -330,6 +333,10 @@ public class GenerateProxy {
 
     public void setHeader(boolean header) {
         SOAP_HEADER = header;
+    }
+
+    public void setCaseInsensitive(boolean caseInsensitive) {
+        this.CASE_INSENSITIVE_CONDITIONS = caseInsensitive;
     }
 
     public void setTemplateFolder(String folder) { templateFolder = folder; }
@@ -670,7 +677,10 @@ public class GenerateProxy {
         request = proxyDefault.createElement("Request");
         response = proxyDefault.createElement("Response");
         condition = proxyDefault.createElement("Condition");
-        condition.setTextContent("(proxy.pathsuffix MatchesPath \"/openapi.json\") and (request.verb = \"GET\")");
+        String conditionText = CASE_INSENSITIVE_CONDITIONS ?
+                "(proxy.pathsuffix ~~ \"(?i)/openapi.json\") and (request.verb = \"GET\")" :
+                "(proxy.pathsuffix MatchesPath \"/openapi.json\") and (request.verb = \"GET\")";
+        condition.setTextContent(conditionText);
         step1 = proxyDefault.createElement("Step");
         name1 = proxyDefault.createElement("Name");
         name1.setTextContent("return-open-api");
@@ -695,9 +705,8 @@ public class GenerateProxy {
 
             String httpVerb = apiMap.getVerb();
             String resourcePath = apiMap.getResourcePath();
-            String Condition = "(proxy.pathsuffix MatchesPath \"" + resourcePath + "\") and (request.verb = \""
-                + httpVerb + "\")";
-            //TODO  case-insensitive mode ~~ "(?i)resourcePath"
+
+
             String addSoapAction = operationName + "-add-soapaction";
 
             flow = proxyDefault.createElement("Flow");
@@ -802,6 +811,9 @@ public class GenerateProxy {
                 }
             }
 
+            String Condition = CASE_INSENSITIVE_CONDITIONS ?
+                    "(proxy.pathsuffix ~~ \"(?i)" + resourcePath.toLowerCase() + "\") and (request.verb = \"" + httpVerb + "\")":
+                    "(proxy.pathsuffix MatchesPath \"" + resourcePath + "\") and (request.verb = \"" + httpVerb + "\")";
             LOGGER.fine("Condition: " + Condition);
             condition.setTextContent(Condition);
 
@@ -1612,7 +1624,6 @@ public class GenerateProxy {
             soapCondition.setTextContent(soapConditionText + SOAP12 + "\"))  and (request.verb != \"GET\")");
         }
 
-        String conditionText = "(proxy.pathsuffix MatchesPath \"/\") and (request.verb = \"POST\") and (operation = \"";
         Node flows = proxyDefault.getElementsByTagName("Flows").item(0);
         Node flow;
         Node flowDescription;
@@ -1637,6 +1648,7 @@ public class GenerateProxy {
             request = proxyDefault.createElement("Request");
             response = proxyDefault.createElement("Response");
             condition = proxyDefault.createElement("Condition");
+            String conditionText = "(proxy.pathsuffix MatchesPath \"/\") and (request.verb = \"POST\") and (operation = \"";
             condition.setTextContent(conditionText + apiMap.getRootElement() + "\")");
 
             flow.appendChild(request);
@@ -1656,8 +1668,8 @@ public class GenerateProxy {
         request = proxyDefault.createElement("Request");
         response = proxyDefault.createElement("Response");
         condition = proxyDefault.createElement("Condition");
-        condition.setTextContent(
-            "(proxy.pathsuffix MatchesPath \"/\") and (request.verb = \"GET\") and (request.queryparam.wsdl != \"\")");
+        String conditionText = "(proxy.pathsuffix MatchesPath \"/\") and (request.verb = \"GET\") and (request.queryparam.wsdl != \"\")";
+        condition.setTextContent(conditionText);
 
         step1 = proxyDefault.createElement("Step");
         name1 = proxyDefault.createElement("Name");
@@ -3233,6 +3245,7 @@ public class GenerateProxy {
         System.out.println("-basepath=specify base path");
         System.out.println("-cors=<true|false>        default is false");
         System.out.println("-debug=<true|false>       default is false");
+        System.out.println("-caseInsensitive=<true|false>  if true, case insensitive conditions. Default is false");
         System.out.println("");
         System.out.println("");
         System.out.println("Examples:");
@@ -3347,6 +3360,8 @@ public class GenerateProxy {
         opt.getSet().addOption("templates", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // add SOAP header step
         opt.getSet().addOption("header", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // enable case insensitive conditions
+        opt.getSet().addOption("caseInsensitive", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set basepath
         opt.getSet().addOption("basepath", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set target backend url
@@ -3453,6 +3468,10 @@ public class GenerateProxy {
             genProxy.setBasic(Boolean.valueOf(opt.getSet().getOption("basic").getResultValue(0)));
         }
 
+        if (opt.getSet().isSet("caseInsensitive")) {
+            genProxy.setCaseInsensitive(Boolean.valueOf(opt.getSet().getOption("caseInsensitive").getResultValue(0)));
+        }
+
         if (opt.getSet().isSet("backendurlvalidation")) {
             genProxy.setBackendUrlValidation(Boolean.valueOf(opt.getSet().getOption("backendurlvalidation").getResultValue(0)));
         }
@@ -3495,6 +3514,7 @@ public class GenerateProxy {
         genProxy.setAPIKey(generateProxyOptions.isApiKey());
         genProxy.setOAuth(generateProxyOptions.isOauth());
         genProxy.setBasic(generateProxyOptions.isBasic() && !generateProxyOptions.isOauth());
+        genProxy.setCaseInsensitive(generateProxyOptions.isCaseInsensitive());
         genProxy.setHeader(generateProxyOptions.isHeader());
         genProxy.setTemplateFolder( generateProxyOptions.getTemplateFolder() );
         genProxy.setQuotaAPIKey(generateProxyOptions.isApiKey() && generateProxyOptions.isQuota());

@@ -36,6 +36,7 @@ templates=<Path>          Path to custom templates which can be used for request
 header=false              Don't add SOAP header processing
 basepath=Uses the basepath from the wsdl
 cors=false                Don't enable CORS; Works only for SOAP to REST
+caseInsensitive=false     Generate case sensitive conditions
 build=specify build folder   default is temp folder; ensure user has access to read/write to temp folder
 opsmap=specify operations map
 backendurl = Specify the target backend url

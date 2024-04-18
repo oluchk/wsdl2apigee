@@ -625,7 +625,6 @@ public class GenerateProxy {
 
             step1 = proxyDefault.createElement("Step");
             name1 = proxyDefault.createElement("Name");
-
             name1.setTextContent(cors);
             step1.appendChild(name1);
 
@@ -780,6 +779,14 @@ public class GenerateProxy {
                 // TODO: add condition here to convert to XML only if
                 // Content-Type is json;
 
+                if (SOAP_HEADER) {
+                    Node step = proxyDefault.createElement("Step");
+                    Node name = proxyDefault.createElement("Name");
+                    name.setTextContent(operationName + "-assign-message");
+                    step.appendChild(name);
+                    request.appendChild(step);
+                }
+
                 name2.setTextContent(operationName + "-add-namespace");
                 step2.appendChild(name2);
                 request.appendChild(step2);
@@ -802,13 +809,7 @@ public class GenerateProxy {
                     request.appendChild(step5);
                 }
 
-                if (SOAP_HEADER) {
-                    Node step6 = proxyDefault.createElement("Step");
-                    Node name6 = proxyDefault.createElement("Name");
-                    name6.setTextContent(operationName + "-assign-message");
-                    step6.appendChild(name6);
-                    request.appendChild(step6);
-                }
+
             }
 
             String Condition = CASE_INSENSITIVE_CONDITIONS ?

@@ -491,30 +491,44 @@ public class GenerateProxy {
             String oauthPolicy = "verify-oauth-v2-access-token";
             String remoOAuthPolicy = "remove-header-authorization";
             String quota = "impose-quota-oauth";
+            String oauthInfoPolicy = "get-oauth-v2-info";
 
             // Add policy to proxy.xml
+            Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
+
             Node policy1 = apiTemplateDocument.createElement("Policy");
             policy1.setTextContent(oauthPolicy);
+            policies.appendChild(policy1);
+
+            if (SOAP_HEADER) {
+                Node policy = apiTemplateDocument.createElement("Policy");
+                policy.setTextContent(oauthInfoPolicy);
+
+                policies.appendChild(policy1);
+            }
 
             Node policy2 = apiTemplateDocument.createElement("Policy");
             policy2.setTextContent(remoOAuthPolicy);
-
-            policies.appendChild(policy1);
             policies.appendChild(policy2);
-
-            Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
 
             step1 = proxyDefault.createElement("Step");
             name1 = proxyDefault.createElement("Name");
             name1.setTextContent(oauthPolicy);
             step1.appendChild(name1);
+            preFlowRequest.appendChild(step1);
+
+            if (SOAP_HEADER) {
+                Node step = proxyDefault.createElement("Step");
+                Node name = proxyDefault.createElement("Name");
+                name.setTextContent(oauthInfoPolicy);
+                step.appendChild(name);
+                preFlowRequest.appendChild(step);
+            }
 
             step2 = proxyDefault.createElement("Step");
             name2 = proxyDefault.createElement("Name");
             name2.setTextContent(remoOAuthPolicy);
             step2.appendChild(name2);
-
-            preFlowRequest.appendChild(step1);
             preFlowRequest.appendChild(step2);
 
             if (QUOTAOAUTH) {
@@ -522,8 +536,8 @@ public class GenerateProxy {
                 policy2.setTextContent(quota);
                 policies.appendChild(policy3);
 
-                Element step3 = proxyDefault.createElement("Step");
-                Element name3 = proxyDefault.createElement("Name");
+                Node step3 = proxyDefault.createElement("Step");
+                Node name3 = proxyDefault.createElement("Name");
                 name3.setTextContent(quota);
                 step3.appendChild(name3);
                 preFlowRequest.appendChild(step3);
@@ -551,22 +565,21 @@ public class GenerateProxy {
             name1 = proxyDefault.createElement("Name");
             name1.setTextContent(apiKeyPolicy);
             step1.appendChild(name1);
+            preFlowRequest.appendChild(step1);
 
             step2 = proxyDefault.createElement("Step");
             name2 = proxyDefault.createElement("Name");
             name2.setTextContent(remoAPIKeyPolicy);
             step2.appendChild(name2);
-
-            preFlowRequest.appendChild(step1);
             preFlowRequest.appendChild(step2);
 
             if (QUOTAAPIKEY) {
                 Node policy3 = apiTemplateDocument.createElement("Policy");
-                policy2.setTextContent(quota);
+                policy3.setTextContent(quota);
                 policies.appendChild(policy3);
 
-                Element step3 = proxyDefault.createElement("Step");
-                Element name3 = proxyDefault.createElement("Name");
+                Node step3 = proxyDefault.createElement("Step");
+                Node name3 = proxyDefault.createElement("Name");
                 name3.setTextContent(quota);
                 step3.appendChild(name3);
                 preFlowRequest.appendChild(step3);
@@ -1344,6 +1357,11 @@ public class GenerateProxy {
                             Paths.get(targetPath + "impose-quota-oauth.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
                     }
+                    if (SOAP_HEADER) {
+                        Files.copy(getSourceStream(sourcePath,"get-oauth-v2-info.xml"),
+                                Paths.get(targetPath + "get-oauth-v2-info.xml"),
+                                StandardCopyOption.REPLACE_EXISTING);
+                    }
                 }
 
                 if (BASIC_AUTH) {
@@ -1438,6 +1456,11 @@ public class GenerateProxy {
                             Paths.get(targetPath + "impose-quota-oauth.xml"),
                             StandardCopyOption.REPLACE_EXISTING);
                     }
+                    if (SOAP_HEADER) {
+                        Files.copy(getSourceStream(sourcePath,"get-oauth-v2-info.xml"),
+                                Paths.get(targetPath + "get-oauth-v2-info.xml"),
+                                StandardCopyOption.REPLACE_EXISTING);
+                    }
                 }
 
                 if (BASIC_AUTH) {
@@ -1512,10 +1535,10 @@ public class GenerateProxy {
 
         // add oauth policies if set
         if (OAUTH) {
-
             String oauthPolicy = "verify-oauth-v2-access-token";
             String remoOAuthPolicy = "remove-header-authorization";
             String quota = "impose-quota-oauth";
+            String oauthInfoPolicy = "get-oauth-v2-info";
 
             Node preFlowRequest = proxyDefault.getElementsByTagName("PreFlow").item(0).getChildNodes().item(1);
 
@@ -1523,6 +1546,14 @@ public class GenerateProxy {
             Node name1 = proxyDefault.createElement("Name");
             name1.setTextContent(oauthPolicy);
             step1.appendChild(name1);
+
+            if (SOAP_HEADER) {
+                Node step = proxyDefault.createElement("Step");
+                Node name = proxyDefault.createElement("Name");
+                name.setTextContent(oauthInfoPolicy);
+                step.appendChild(name1);
+                preFlowRequest.appendChild(step);
+            }
 
             Node step2 = proxyDefault.createElement("Step");
             Node name2 = proxyDefault.createElement("Name");

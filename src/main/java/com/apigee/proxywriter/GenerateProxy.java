@@ -3271,7 +3271,7 @@ public class GenerateProxy {
         System.out.println("-cors=<true|false>        default is false");
         System.out.println("-debug=<true|false>       default is false");
         System.out.println("-bodyLimit=<4096>         defines trigger for simplified policy");
-        System.out.println("-defaultOps=<GET|POST>    default HTTP method if opsMap defined");
+        System.out.println("-defaultOps=<GET|POST|NULL>    default HTTP method if opsMap defined");
         System.out.println("-caseInsensitive=<true|false>  if true, case insensitive flow conditions. Default is false");
         System.out.println("");
         System.out.println("");

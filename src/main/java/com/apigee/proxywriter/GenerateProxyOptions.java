@@ -17,10 +17,13 @@ public class GenerateProxyOptions {
     private final boolean quota;
     private final boolean caseInsensitive;
     private final String operationsFilter;
+    private final String defaultOps;
+    private final int bodyLimitSize;
 
     public GenerateProxyOptions(String wsdl, String port, boolean passthrough, String description, String basepath,
                 String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota, boolean basic,
-                                String operationsFilter, String templateFolder, boolean header, boolean caseInsensitive) {
+                                String operationsFilter, String templateFolder, boolean header,
+                                boolean caseInsensitive, int bodyLimitSize, String defaultOps) {
         this.wsdl = wsdl;
         this.port = port;
         this.passthrough = passthrough;
@@ -36,6 +39,8 @@ public class GenerateProxyOptions {
         this.quota = quota;
         this.operationsFilter = operationsFilter;
         this.caseInsensitive = caseInsensitive;
+        this.defaultOps = defaultOps;
+        this.bodyLimitSize = bodyLimitSize;
     }
 
     public String getWsdl() {
@@ -86,7 +91,7 @@ public class GenerateProxyOptions {
         return templateFolder;
     }
 
-    public boolean isBasic() {
+    public boolean isBasicAuth() {
         return basic;
     }
 
@@ -97,4 +102,8 @@ public class GenerateProxyOptions {
     public boolean isCaseInsensitive() {
         return caseInsensitive;
     }
+
+    public int getBodyLimitSize() { return bodyLimitSize; }
+
+    public String getDefaultOps() { return defaultOps; }
 }

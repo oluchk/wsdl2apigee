@@ -11,6 +11,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXParseException;
 
 
 public class OpsMap {
@@ -26,13 +27,17 @@ public class OpsMap {
 	}
 
 	private List<Operation> opsMap;
+	private String defaultOps = "GET";
 	
-	public OpsMap() {
+	public OpsMap(String defaultOps) {
+		this.defaultOps = defaultOps;
 		opsMap = new ArrayList<Operation>();
 	}
 	
-	public OpsMap(String OPSMAPPING_TEMPLATE) throws Exception{
+	public OpsMap(String OPSMAPPING_TEMPLATE, String defaultOps) throws Exception {
 		opsMap = new ArrayList<Operation>();
+
+		this.defaultOps = defaultOps;
 		readOperationsMap(OPSMAPPING_TEMPLATE);
 	}
 
@@ -58,7 +63,7 @@ public class OpsMap {
 						return o.getVerb();
 					}
 				} else if (o.getLocation().equalsIgnoreCase("endsWith")) {
-					if (lcOperationName.startsWith(o.getPattern())) {
+					if (lcOperationName.endsWith(o.getPattern())) {
 						return o.getVerb();
 					}
 				} else { //assume contains
@@ -66,7 +71,7 @@ public class OpsMap {
 				}
 			}
 		}
-		return "GET";
+		return defaultOps;
 	}
 	
 	public String getResourcePath (String operationName, HashMap<String, SelectedOperation> selectedOperations) {
@@ -94,7 +99,11 @@ public class OpsMap {
 		LOGGER.entering(OpsMap.class.getName(), new Object() {
 		}.getClass().getEnclosingMethod().getName());
 
-		Node verbNode = opsMappingXML.getElementsByTagName(verb).item(0);
+		Node verbNode = null;
+		NodeList elements = opsMappingXML.getElementsByTagName(verb);
+		if (elements != null) {
+			verbNode = elements.item(0);
+		}
 		if (verbNode != null) {
 			NodeList getOpsList = verbNode.getChildNodes();
 			for (int i = 0; i < getOpsList.getLength(); i++) {
@@ -122,7 +131,11 @@ public class OpsMap {
 		try {
 			//first try to read it as a file containing xml
 			opsMappingXML = xmlUtils.readXML(OPSMAPPING_TEMPLATE);
-		} catch (Exception e) {
+	    }
+		catch (SAXParseException e){
+			LOGGER.severe( e.getMessage() );
+		}
+		catch (Exception e) {
 			//second try to read it as a string containing xml
 			try {
 				opsMappingXML = xmlUtils.getXMLFromString(OPSMAPPING_TEMPLATE);
@@ -131,6 +144,7 @@ public class OpsMap {
 //				opsMappingXML = xmlUtils.getXMLFromJSONString(OPSMAPPING_TEMPLATE);
 			}
 		}
+
 					
 		for (String v : verbs) {
 			readOperation(v, opsMappingXML);

@@ -159,6 +159,10 @@ public class GenerateProxy {
     // elements
     private boolean TOO_MANY;
 
+    private int BODY_LIMIT_SIZE = 4096;
+
+    private String DEFAULT_OPS = "GET";
+
     private String targetEndpoint;
 
     private String soapVersion;
@@ -170,6 +174,7 @@ public class GenerateProxy {
     private String basePath;
 
     private String backendUrl;
+
     private String proxyName;
 
     private String opsMap;
@@ -232,7 +237,7 @@ public class GenerateProxy {
         // initialize hashmap
         messageTemplates = new HashMap<String, APIMap>();
         xpathElement = new HashMap<Integer, String>();
-        operationsMap = new OpsMap();
+
         selectedOperations = new SelectedOperations();
         vHosts = new ArrayList<String>();
         // open-api feature
@@ -259,6 +264,8 @@ public class GenerateProxy {
         TOO_MANY = false;
         backendUrlValidation = true;
         level = 0;
+        BODY_LIMIT_SIZE = 4096;
+        DEFAULT_OPS = "GET";
     }
 
     public void setSelectedOperationsJson(String json) throws Exception {
@@ -344,6 +351,11 @@ public class GenerateProxy {
     public String getTargetEndpoint() {
         return targetEndpoint;
     }
+
+    public void setBodyLimitSize(int bodyLimit) { BODY_LIMIT_SIZE = bodyLimit; }
+
+    public void setDefaultOps(String defaultOps) {
+        DEFAULT_OPS = defaultOps; }
 
     private String getTemplate(String defaultTemplate){
         if (templateFolder != null) {
@@ -1104,7 +1116,7 @@ public class GenerateProxy {
         APIMap apiMap = messageTemplates.get(operationName);
 
         // edgeui-654
-        if (apiMap.getSoapBody().getBytes().length < 4096) {
+        if (apiMap.getSoapBody().getBytes().length < BODY_LIMIT_SIZE) {
             List<String> elementList = xmlUtils.getElementList(apiMap.getSoapBody());
             for (String elementName : elementList) {
                 queryParam = extractPolicyXML.createElement("QueryParam");
@@ -1195,7 +1207,8 @@ public class GenerateProxy {
             APIMap apiMap = messageTemplates.get(operationName);
             Document operationPayload = null;
             // edgeui-654 (check for getBytes().length
-            if (xmlUtils.isValidXML(apiMap.getSoapBody()) && apiMap.getSoapBody().getBytes().length < 4096) {
+            if (xmlUtils.isValidXML(apiMap.getSoapBody()) &&
+                    apiMap.getSoapBody().getBytes().length < BODY_LIMIT_SIZE) {
                 // JIRA-EDGEUI-672
                 operationPayload = xmlUtils.getXMLFromString(replaceReservedVariables(apiMap.getSoapBody()));
             } else {
@@ -2669,7 +2682,7 @@ public class GenerateProxy {
         // EDGEUI-659
         if (!soapVersion.equalsIgnoreCase(SOAP_11) && !soapVersion.equalsIgnoreCase(SOAP_12)) {
             // set default
-            LOGGER.warning("Unknow SOAP Version. Setting to SOAP 1.1");
+            LOGGER.warning("Unknown SOAP Version. Setting to SOAP 1.1");
             soapVersion = SOAP_11;
         }
 
@@ -2802,9 +2815,14 @@ public class GenerateProxy {
                     // operation from opsmap
                     if (!ALLPOST) {
                         verb = operationsMap.getVerb(op.getName(), selectedOperationList);
+                        if ( verb == null ) {
+                            return;
+                        }
                     } else { // else POST
                         verb = "POST";
                     }
+
+
 
                     if (RPCSTYLE) {
                         apiMap = createAPIMap(op, wsdl, verb, resourcePath, xmlUtils);
@@ -2970,6 +2988,7 @@ public class GenerateProxy {
         @SuppressWarnings("resource")
         String oasTemplate = new Scanner(getClass().getResourceAsStream(OAS_TEMPLATE), "UTF-8").useDelimiter("\\A")
             .next();
+
         JsonObject oasObject = new JsonParser().parse(oasTemplate).getAsJsonObject();
         JsonObject paths = oasObject.getAsJsonObject("paths");
         JsonObject info = oasObject.getAsJsonObject("info");
@@ -3000,7 +3019,11 @@ public class GenerateProxy {
 
             String resourcePath = operationsMap.getResourcePath(op.getName(), selectedOperationList);
             if (!ALLPOST) {
-                verb = operationsMap.getVerb(op.getName(), selectedOperationList).toLowerCase();
+                verb = operationsMap.getVerb(op.getName(), selectedOperationList);
+                if (verb == null ){
+                    continue;
+                }
+                verb = verb.toLowerCase();
             } else { // else POST
                 verb = new String("POST").toLowerCase();
             }
@@ -3129,6 +3152,7 @@ public class GenerateProxy {
         Path tempDirectory = null;
         InputStream is = null;
         GenerateBundle generateBundle = new GenerateBundle();
+        operationsMap = new OpsMap( DEFAULT_OPS );
 
         try {
             if (buildFolder == null) {
@@ -3246,7 +3270,9 @@ public class GenerateProxy {
         System.out.println("-basepath=specify base path");
         System.out.println("-cors=<true|false>        default is false");
         System.out.println("-debug=<true|false>       default is false");
-        System.out.println("-caseInsensitive=<true|false>  if true, case insensitive conditions. Default is false");
+        System.out.println("-bodyLimit=<4096>         defines trigger for simplified policy");
+        System.out.println("-defaultOps=<GET|POST>    default HTTP method if opsMap defined");
+        System.out.println("-caseInsensitive=<true|false>  if true, case insensitive flow conditions. Default is false");
         System.out.println("");
         System.out.println("");
         System.out.println("Examples:");
@@ -3268,7 +3294,7 @@ public class GenerateProxy {
             "$ java -jar wsdl2apigee.jar -wsdl=\"http://www.thomas-bayer.com/axis2/services/BLZService?wsdl\" -oas=true");
     }
 
-    private static List<WsdlDefinitions.Port> convertPorts(List<Port> ports,
+    private  List<WsdlDefinitions.Port> convertPorts(List<Port> ports,
                                                            List<PortType> portTypes) {
         List<WsdlDefinitions.Port> list = new ArrayList<>(ports.size());
         for (Port port : ports) {
@@ -3283,11 +3309,11 @@ public class GenerateProxy {
         return list;
     }
 
-    private static List<WsdlDefinitions.Operation> convertOperations(Binding binding, List<PortType> portTypes) {
+    private  List<WsdlDefinitions.Operation> convertOperations(Binding binding, List<PortType> portTypes) {
         List<WsdlDefinitions.Operation> list = new ArrayList<>();
         OpsMap opsMap = null;
         try {
-            opsMap = new OpsMap(OPSMAPPING_TEMPLATE);
+            opsMap = new OpsMap(OPSMAPPING_TEMPLATE, DEFAULT_OPS);
         } catch (Exception e) {
         }
 
@@ -3312,7 +3338,7 @@ public class GenerateProxy {
         return "";
     }
 
-    private static WsdlDefinitions definitionsToWsdlDefinitions(Definitions definitions) {
+    private  WsdlDefinitions definitionsToWsdlDefinitions(Definitions definitions) {
         List<WsdlDefinitions.Service> services = new ArrayList<>();
         definitions.getServices();
         for (Service service : definitions.getServices()) {
@@ -3375,6 +3401,10 @@ public class GenerateProxy {
         opt.getSet().addOption("oas", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set this flag to enable debug
         opt.getSet().addOption("debug", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // define body limit size after it simplified code will be generated
+        opt.getSet().addOption("bodyLimit", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // set default ops, GET is default.
+        opt.getSet().addOption("defaultOps", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
 
         opt.check();
 
@@ -3424,6 +3454,15 @@ public class GenerateProxy {
             genProxy.setOpsMap(opt.getSet().getOption("opsmap").getResultValue(0));
         } else {
             genProxy.setOpsMap(GenerateProxy.OPSMAPPING_TEMPLATE);
+        }
+
+        if (opt.getSet().isSet("defaultOps")) {
+            String defaultOps = opt.getSet().getOption("defaultOps").getResultValue(0).toUpperCase();
+            genProxy.setDefaultOps("NULL".equals(defaultOps) ? null : defaultOps);
+        }
+
+        if (opt.getSet().isSet("bodyLimit")) {
+            genProxy.setBodyLimitSize(Integer.valueOf(opt.getSet().getOption("bodyLimit").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("allpost")) {
@@ -3514,7 +3553,7 @@ public class GenerateProxy {
         genProxy.setCORS(generateProxyOptions.isCors());
         genProxy.setAPIKey(generateProxyOptions.isApiKey());
         genProxy.setOAuth(generateProxyOptions.isOauth());
-        genProxy.setBasic(generateProxyOptions.isBasic() && !generateProxyOptions.isOauth());
+        genProxy.setBasic(generateProxyOptions.isBasicAuth() && !generateProxyOptions.isOauth());
         genProxy.setCaseInsensitive(generateProxyOptions.isCaseInsensitive());
         genProxy.setHeader(generateProxyOptions.isHeader());
         genProxy.setTemplateFolder( generateProxyOptions.getTemplateFolder() );
@@ -3528,7 +3567,7 @@ public class GenerateProxy {
             : "Generated SOAP to API proxy", generateProxyOptions.getWsdl());
     }
 
-    public static WsdlDefinitions parseWsdl(String wsdl) throws ErrorParsingWsdlException {
+    public WsdlDefinitions parseWsdl(String wsdl) throws ErrorParsingWsdlException {
         final WSDLParser2 wsdlParser = new WSDLParser2();
         try {
             final Definitions definitions = wsdlParser.parse(wsdl);

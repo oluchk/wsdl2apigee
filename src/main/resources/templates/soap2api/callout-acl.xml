@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ServiceCallout continueOnError="true" enabled="true" name="callout-acl">
+    <DisplayName>Callout ACL</DisplayName>
+    <Properties/>
+    <Request variable="authenticationRequest">
+        <Set>
+            <Headers>
+                <Header name="Authorization">{request.header.authorization}</Header>
+            </Headers>
+            <Payload contentType="application/json">{
+    "GrantType" : "CLIENT_CREDENTIALS",
+    "BusinessContext" : "Default",
+    "UserType" : "WEB",
+    "UserIPAddress" : "1.1.1.1",
+    "IncludeChain":true
+}
+</Payload>
+            <Verb>POST</Verb>
+        </Set>
+    </Request>
+    <Response>aclResponse</Response>
+    <HTTPTargetConnection>
+        <Properties/>
+        <URL>https://example.com</URL>
+    </HTTPTargetConnection>
+</ServiceCallout>

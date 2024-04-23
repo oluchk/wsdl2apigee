@@ -10,7 +10,8 @@ public class GenerateProxyOptions {
     private final String vHosts;
     private final boolean cors;
     private final boolean apiKey;
-    private final boolean basic;
+    private final boolean basicAuth;
+    private final boolean calloutACL;
     private final boolean header;
 
     private final boolean oauth;
@@ -21,7 +22,9 @@ public class GenerateProxyOptions {
     private final int bodyLimitSize;
 
     public GenerateProxyOptions(String wsdl, String port, boolean passthrough, String description, String basepath,
-                String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota, boolean basic,
+                                String vHosts, boolean cors, boolean apiKey, boolean oauth, boolean quota,
+                                boolean basicAuth,
+                                boolean calloutAuth,
                                 String operationsFilter, String templateFolder, boolean header,
                                 boolean caseInsensitive, int bodyLimitSize, String defaultOps) {
         this.wsdl = wsdl;
@@ -33,7 +36,8 @@ public class GenerateProxyOptions {
         this.cors = cors;
         this.apiKey = apiKey;
         this.oauth = oauth;
-        this.basic = basic;
+        this.basicAuth = basicAuth;
+        this.calloutACL = calloutAuth;
         this.header = header;
         this.templateFolder = templateFolder;
         this.quota = quota;
@@ -92,7 +96,11 @@ public class GenerateProxyOptions {
     }
 
     public boolean isBasicAuth() {
-        return basic;
+        return basicAuth;
+    }
+
+    public boolean isCalloutACL() {
+        return calloutACL;
     }
 
     public boolean isHeader() {

@@ -29,7 +29,8 @@ port=If the service contains > 1 port, specify the port name. Otherwise, the fir
 debug=false               Set to true to enable trace.
 vhosts=default
 oauth=false               Don't add the oauth policy
-basic=false               Don't add the basic auth policy
+basic=false               Don't add the basic auth policy (works if oauth disabled)
+acl=false                 Don't add the acl call policy (works if oauth disabled)
 apikey=false              Don't add apikey verification
 quota=false               Works only if apikey or oauth is set
 templates=<Path>          Path to custom templates which can be used for request transformation and for policies
@@ -41,8 +42,12 @@ build=specify build folder   default is temp folder; ensure user has access to r
 opsmap=specify operations map
 backendurl = Specify the target backend url
 backendurlvalidation=false    Specify to disable the backendurl validation
+bodyLimit=<4096>              Defines trigger for simplified generation.
+defaultOps=<GET|POST|NULL>    Defines default HTTP method. GET is default. Works with opsMap.
+
 ```
 ## Output
+
 You should see an API Proxy bundle generated in the same folder you ran the command. The bundle follows the convention of
 {soap-servicename}.zip. You can import the bundle via the Edge Admin UI or tools like [apigeetool](https://www.npmjs.com/package/apigeetool).
 
@@ -59,86 +64,86 @@ When a proxy bundle for SOAP PassThru is generated, the WSDL is hosted at http:/
 OpsMap:
 A file that maps WSDL operations to HTTP Verbs. A Sample Ops Mapping file looks like:
 ```
-{
-  "proxywriter": {
-    "get": {
-      "operation": [
-        {
-          "pattern": "get",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "inq",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "search",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "list",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "retrieve",
-          "location": "beginsWith"
-        }
-      ]
-    },
-    "post": {
-      "operation": [
-        {
-          "pattern": "create",
-          "location": "contains"
-        },
-        {
-          "pattern": "add",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "process",
-          "location": "beginsWith"
-        }
-      ]
-    },
-    "put": {
-      "operation": [
-        {
-          "pattern": "update",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "change",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "modify",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "set",
-          "location": "beginsWith"
-        }
-      ]
-    },
-    "delete": {
-      "operation": [
-        {
-          "pattern": "delete",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "remove",
-          "location": "beginsWith"
-        },
-        {
-          "pattern": "del",
-          "location": "beginsWith"
-        }
-      ]
-    }
-  }
-}
+<root>
+    <proxywriter>
+        <delete>
+            <operation>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>delete</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>remove</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>del</pattern>
+                </element>
+            </operation>
+        </delete>
+        <get>
+            <operation>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>get</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>inq</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>search</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>list</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>retrieve</pattern>
+                </element>
+            </operation>
+        </get>
+        <post>
+            <operation>
+                <element>
+                    <location>contains</location>
+                    <pattern>create</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>add</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>process</pattern>
+                </element>
+            </operation>
+        </post>
+        <put>
+            <operation>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>update</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>change</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>modify</pattern>
+                </element>
+                <element>
+                    <location>beginsWith</location>
+                    <pattern>set</pattern>
+                </element>
+            </operation>
+        </put>
+    </proxywriter>
+</root>
 ```
 
 ## Custom templates 

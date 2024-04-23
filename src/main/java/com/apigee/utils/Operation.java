@@ -1,10 +1,13 @@
 package com.apigee.utils;
 
+import java.util.List;
+
 public class Operation {
 
 	private String verb;
 	private String pattern;
 	private String location;
+	private List<String> steps;
 
 	/**
 	 * @return the verb
@@ -26,10 +29,15 @@ public class Operation {
 	public String getLocation() {
 		return location;
 	}
-	
-	Operation(String p, String l, String v) {
-		pattern = p;
-		verb = v;
-		location = l;
+
+	public List<String> getSteps() {
+		return steps;
+	}
+
+	Operation(String pattern, String location, String verb, List<String> steps) {
+		this.pattern = pattern;
+		this.verb = verb;
+		this.location = location;
+		this.steps = steps;
 	}
 }

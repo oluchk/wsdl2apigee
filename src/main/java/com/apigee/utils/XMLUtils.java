@@ -194,7 +194,8 @@ public class XMLUtils {
 //		return getXMLFromString(XML.toString(json));
 //    }
 
-	private String extractElement(String fullElementName) {
+	private String extractElement(Node node) {
+		String fullElementName = node.getNodeName();
 		if (fullElementName.indexOf(":") != -1) {
 			String elements[] = fullElementName.split(":");
 			return elements[1];
@@ -218,7 +219,8 @@ public class XMLUtils {
 			NodeList nodes = (NodeList) xp.evaluate("//@* | //*[not(*)]", doc, XPathConstants.NODESET);
 
 			for (int i = 0, len = nodes.getLength(); i < len; i++) {
-				elementList.add(extractElement(nodes.item(i).getNodeName()));
+				String elementName = extractElement(nodes.item(i));
+				elementList.add(elementName);
 			}
 			return elementList;
 		} catch (SAXException e) {
@@ -246,10 +248,16 @@ public class XMLUtils {
 			XPath xp = xpf.newXPath();
 						
 			NodeList nodes = (NodeList) xp.evaluate("//@* | //*[not(*)]", doc, XPathConstants.NODESET);
-
+			Map<String, Integer> used = new HashMap<>();
 			for (int i = 0, len = nodes.getLength(); i < len; i++) {
 				Node item = nodes.item(i);
-				item.setTextContent("{" + extractElement(item.getNodeName()) + "}");
+				String elementName = extractElement(nodes.item(i));
+				Integer index = used.get(elementName);
+				used.put( elementName, index==null ? 1 : index + 1);
+				if (index != null){
+					elementName+=index;
+				}
+				item.setTextContent("{" + elementName + "}");
 			}
 
 			Node envelope = doc.getDocumentElement();

@@ -7,7 +7,6 @@ public class Operation {
 	private String verb;
 	private String pattern;
 	private String location;
-	private List<String> steps;
 
 	/**
 	 * @return the verb
@@ -30,14 +29,9 @@ public class Operation {
 		return location;
 	}
 
-	public List<String> getSteps() {
-		return steps;
-	}
-
-	Operation(String pattern, String location, String verb, List<String> steps) {
+	Operation(String pattern, String location, String verb) {
 		this.pattern = pattern;
 		this.verb = verb;
 		this.location = location;
-		this.steps = steps;
 	}
 }

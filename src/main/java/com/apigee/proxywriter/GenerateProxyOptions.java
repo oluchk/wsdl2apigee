@@ -12,6 +12,7 @@ public class GenerateProxyOptions {
     private final boolean apiKey;
     private final boolean basicAuth;
     private final boolean calloutACL;
+    private final boolean useJsonXML;
     private final boolean header;
 
     private final boolean oauth;
@@ -26,7 +27,7 @@ public class GenerateProxyOptions {
                                 boolean basicAuth,
                                 boolean calloutAuth,
                                 String operationsFilter, String templateFolder, boolean header,
-                                boolean caseInsensitive, int bodyLimitSize, String defaultOps) {
+                                boolean caseInsensitive, int bodyLimitSize, String defaultOps, boolean useJsonXML) {
         this.wsdl = wsdl;
         this.port = port;
         this.passthrough = passthrough;
@@ -45,6 +46,7 @@ public class GenerateProxyOptions {
         this.caseInsensitive = caseInsensitive;
         this.defaultOps = defaultOps;
         this.bodyLimitSize = bodyLimitSize;
+        this.useJsonXML = useJsonXML;
     }
 
     public String getWsdl() {
@@ -114,4 +116,8 @@ public class GenerateProxyOptions {
     public int getBodyLimitSize() { return bodyLimitSize; }
 
     public String getDefaultOps() { return defaultOps; }
+
+    public boolean isUseJson2XML() {
+        return useJsonXML;
+    }
 }

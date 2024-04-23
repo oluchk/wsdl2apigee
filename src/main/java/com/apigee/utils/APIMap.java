@@ -10,15 +10,16 @@ public class APIMap {
 	private String rootElement;
 	private boolean otherNamespaces;
 	
-	public APIMap(String j, String s, String r, String v, String re, boolean ons) {
-		jsonBody = j;
-		soapBody = s;
-		resourcePath = r;
-		verb = v;
-		rootElement = re;
-		otherNamespaces = ons;
+	public APIMap(String jsonBody, String soapBody, String resourcePath,
+				  String verb, String rootElement, boolean otherNamespace) {
+		this.jsonBody = jsonBody;
+		this.soapBody = soapBody;
+		this.resourcePath = resourcePath;
+		this.verb = verb;
+		this.rootElement = rootElement;
+		this.otherNamespaces = otherNamespace;
 	}
-	
+
 	public String getJsonBody() {
 		return jsonBody;
 	}

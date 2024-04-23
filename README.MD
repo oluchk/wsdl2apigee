@@ -44,6 +44,7 @@ backendurl = Specify the target backend url
 backendurlvalidation=false    Specify to disable the backendurl validation
 bodyLimit=<4096>              Defines trigger for simplified generation.
 defaultOps=<GET|POST|NULL>    Defines default HTTP method. GET is default. Works with opsMap.
+useJson2Xml=false             If true, GET is generated using JSON 2 XML template
 
 ```
 ## Output
@@ -64,86 +65,88 @@ When a proxy bundle for SOAP PassThru is generated, the WSDL is hosted at http:/
 OpsMap:
 A file that maps WSDL operations to HTTP Verbs. A Sample Ops Mapping file looks like:
 ```
-<root>
-    <proxywriter>
-        <delete>
-            <operation>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>delete</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>remove</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>del</pattern>
-                </element>
-            </operation>
-        </delete>
-        <get>
-            <operation>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>get</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>inq</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>search</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>list</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>retrieve</pattern>
-                </element>
-            </operation>
-        </get>
-        <post>
-            <operation>
-                <element>
-                    <location>contains</location>
-                    <pattern>create</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>add</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>process</pattern>
-                </element>
-            </operation>
-        </post>
-        <put>
-            <operation>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>update</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>change</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>modify</pattern>
-                </element>
-                <element>
-                    <location>beginsWith</location>
-                    <pattern>set</pattern>
-                </element>
-            </operation>
-        </put>
-    </proxywriter>
-</root>
+<proxywriter>
+	<get>
+		<operation>
+			<pattern>get</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>inq</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>search</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>list</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>retrieve</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>fetch</pattern>
+			<location>beginsWith</location>
+		</operation>
+	</get>
+	<post>
+		<operation>
+			<pattern>create</pattern>
+			<location>contains</location>
+		</operation>
+		<operation>
+			<pattern>add</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>process</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>submit</pattern>
+			<location>beginsWith</location>
+		</operation>
+	</post>
+	<put>
+		<operation>
+			<pattern>update</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>change</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>modify</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>set</pattern>
+			<location>beginsWith</location>
+		</operation>
+	</put>
+	<delete>
+		<operation>
+			<pattern>delete</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>remove</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>del</pattern>
+			<location>beginsWith</location>
+		</operation>
+		<operation>
+			<pattern>cancel</pattern>
+			<location>beginsWith</location>
+		</operation>
+	</delete>
+</proxywriter>
 ```
 
 ## Custom templates 

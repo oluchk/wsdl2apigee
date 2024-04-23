@@ -48,7 +48,10 @@ public class XMLUtils {
 		builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 	}
 	
-	public boolean isValidXML(String xml) {
+	public static boolean isValidXML(String xml) {
+		if ( xml == null || xml.length() == 0){
+			return false;
+		}
 		try {
 			DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
 			documentBuilderFactory.setNamespaceAware(true);
@@ -222,17 +225,12 @@ public class XMLUtils {
 				String elementName = extractElement(nodes.item(i));
 				elementList.add(elementName);
 			}
-			return elementList;
-		} catch (SAXException e) {
-			LOGGER.severe(e.getMessage());
-			throw e;
-		} catch (IOException e) {
-			LOGGER.severe(e.getMessage());
-			throw e;
-		} catch (XPathExpressionException e) {
+
+		} catch (Exception e) {
 			LOGGER.severe(e.getMessage());
 			throw e;
 		}
+		return elementList;
 	}
 
 	public KeyValue<String, String> replacePlaceHolders(String xml) throws Exception {

@@ -163,9 +163,11 @@ public class GenerateProxy {
     // elements
     private boolean TOO_MANY;
 
-    private int BODY_LIMIT_SIZE = 4096;
+    private int BODY_LIMIT_SIZE;
 
-    private String DEFAULT_OPS = "GET";
+    private String DEFAULT_OPS;
+
+    private boolean USE_JSON2XML;
 
     private String targetEndpoint;
 
@@ -271,6 +273,7 @@ public class GenerateProxy {
         level = 0;
         BODY_LIMIT_SIZE = 4096;
         DEFAULT_OPS = "GET";
+        USE_JSON2XML = false;
     }
 
     public void setSelectedOperationsJson(String json) throws Exception {
@@ -303,6 +306,10 @@ public class GenerateProxy {
 
     public void setOpsMap(String oMap) {
         opsMap = oMap;
+    }
+
+    public void setUseJson2Xml(boolean flag){
+        USE_JSON2XML = flag;
     }
 
     public void setVHost(String vhosts) {
@@ -710,18 +717,23 @@ public class GenerateProxy {
 
             if ("GET".equalsIgnoreCase(httpVerb)) {
 
-                if ( apiMap.getSoapBody().length() <  BODY_LIMIT_SIZE) {
-                    if (apiMap.getJsonBody() != null) {
-                        Node step = buildStep(proxyDefault, operationName + "-extract-query-param");
-                        request.appendChild(step);
-                    }
-                }
-                else {
+                if (USE_JSON2XML) {
                     Node step0 = buildStep(proxyDefault, operationName + "-query-to-json");
                     request.appendChild(step0);
 
                     Node step = buildStep(proxyDefault, operationName + "-json-to-xml");
                     request.appendChild(step);
+                }
+                else {
+                    if ( apiMap.getSoapBody().length() < BODY_LIMIT_SIZE ) {
+                        if (apiMap.getJsonBody() != null) {
+                            Node step = buildStep(proxyDefault, operationName + "-extract-query-param");
+                            request.appendChild(step);
+                        }
+                    }
+                    else {
+                        LOGGER.warning( operationName + "-extract-query-param skipped" );
+                    }
                 }
 
                 step1 = buildStep(proxyDefault, buildSOAPPolicy);
@@ -786,44 +798,43 @@ public class GenerateProxy {
 
             if ("GET".equalsIgnoreCase(httpVerb)) {
 
-                // Add policy to proxy.xml
-                if (apiMap.getSoapBody().length() < BODY_LIMIT_SIZE) {
-                    if (apiMap.getJsonBody() != null) {
-                        Document extractTemplate = xmlUtils.readXML(getTemplate(SOAP2API_EXTRACT_TEMPLATE));
+                if (USE_JSON2XML) {
+                    Document queryTemplate = xmlUtils.readXML( getTemplate(SOAP2API_QUERY2JSON_TEMPLATE) );
+                    Node policy1 = apiTemplateDocument.createElement("Policy");
+                    policy1.setTextContent(operationName + "-query-to-json");
+                    policies.appendChild(policy1);
 
-                        Node policy = apiTemplateDocument.createElement("Policy");
-                        policy.setTextContent(operationName + "-extract-query-param");
-                        policies.appendChild(policy);
+                    // write Query to JSON Policy
+                    writeQueryToJsonPolicy(queryTemplate, operationName);
+                    writeJsonToXMLPolicy(jsonXMLTemplate, operationName);
+                }
+                else {
+                    if (apiMap.getSoapBody().length() < BODY_LIMIT_SIZE) {
+                        if (apiMap.getJsonBody() != null) {
+                            Document extractTemplate = xmlUtils.readXML(getTemplate(SOAP2API_EXTRACT_TEMPLATE));
 
-                        // write Extract Variable Policy
-                        writeSOAP2APIExtractPolicy(extractTemplate, operationName, operationName + "-extract-query-param");
+                            Node policy = apiTemplateDocument.createElement("Policy");
+                            policy.setTextContent(operationName + "-extract-query-param");
+                            policies.appendChild(policy);
+
+                            // write Extract Variable Policy
+                            writeSOAP2APIExtractPolicy(extractTemplate, operationName, operationName + "-extract-query-param");
+                        }
                     }
-                  }
-                  else {
-                        Document queryTemplate = xmlUtils.readXML( getTemplate(SOAP2API_QUERY2JSON_TEMPLATE) );
-                        Node policy1 = apiTemplateDocument.createElement("Policy");
-                        policy1.setTextContent(operationName + "-query-to-json");
-                        policies.appendChild(policy1);
-
-                        // write Query to JSON Policy
-                        writeQueryToJsonPolicy(queryTemplate, operationName);
-                        writeJsonToXMLPolicy(jsonXMLTemplate, operationName);
-                  }
-
+                    else {
+                        LOGGER.warning( operationName + "-extract-query-param skipped" );
+                    }
+                }
 
                 Node policy2 = apiTemplateDocument.createElement("Policy");
                 policy2.setTextContent(buildSOAPPolicy);
                 policies.appendChild(policy2);
-                // write Assign Message Policy
 
-                String payloadType = SOAP12_PAYLOAD_TYPE;
-                if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                    payloadType = SOAP11_PAYLOAD_TYPE;
-                }
+                // write Assign Message Policy
                 writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
                         operationName + "-build-soap",
                         operationName + " Build SOAP",
-                     apiMap.getSoapAction(), payloadType);
+                     apiMap.getSoapAction(), true);
             } else {
 
                 /*
@@ -867,7 +878,7 @@ public class GenerateProxy {
                     writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
                             operationName + "-assign-message",
                             operationName + " Assign Message",
-                            apiMap.getSoapAction(), null);
+                            apiMap.getSoapAction(), false);
                 }
             }
         }
@@ -1114,7 +1125,9 @@ public class GenerateProxy {
         APIMap apiMap = messageTemplates.get(operationName);
 
         // edgeui-654
-        if (apiMap.getSoapBody().getBytes().length < BODY_LIMIT_SIZE) {
+        if ( XMLUtils.isValidXML(apiMap.getSoapBody()) &&
+                apiMap.getSoapBody().getBytes().length < BODY_LIMIT_SIZE) {
+
             List<String> elementList = xmlUtils.getElementList(apiMap.getSoapBody());
             Map<String, Integer> used = new HashMap<>();
             for (String elementName : elementList) {
@@ -1134,7 +1147,7 @@ public class GenerateProxy {
             }
         } else {
             // setting a sample query param;edgeui-654
-            LOGGER.warning("Large SOAP Message Template; Skipping extract policy");
+            LOGGER.warning("Large or invalid SOAP Message Template; Skipping extract policy");
             queryParam = extractPolicyXML.createElement("QueryParam");
             queryParam.setAttribute("name", "sample");
 
@@ -1171,12 +1184,12 @@ public class GenerateProxy {
 
     private void writeSOAP2APIAssignMessagePolicies(Document template, String operationName,
                                                     String policyName, String policyDisplayName,
-                                                    String soapAction, String payloadType) throws Exception {
+                                                    String soapAction, boolean payload) throws Exception {
 
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
-        XMLUtils xmlUtils = new XMLUtils();
 
+        XMLUtils xmlUtils = new XMLUtils();
         Document document = xmlUtils.cloneDocument(template);
 
         Node rootElement = document.getFirstChild();
@@ -1187,12 +1200,12 @@ public class GenerateProxy {
         Node displayName = document.getElementsByTagName("DisplayName").item(0);
         displayName.setTextContent(policyDisplayName);
 
-        Node payload = document.getElementsByTagName("Payload").item(0);
-        if ( payloadType != null ){
-            NamedNodeMap payloadNodeMap = payload.getAttributes();
+        if ( payload ){
+            Node payloadNode = document.getElementsByTagName("Payload").item(0);
+            NamedNodeMap payloadNodeMap = payloadNode.getAttributes();
             Node payloadAttr = payloadNodeMap.getNamedItem("contentType");
-            payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(payloadType));
             if (soapVersion.equalsIgnoreCase(SOAP_11)) {
+                payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(SOAP11_PAYLOAD_TYPE));
                 document.getElementsByTagName("Header").item(1)
                         .setTextContent(StringEscapeUtils.escapeXml10(SOAP11_CONTENT_TYPE));
                 if (soapAction != null) {
@@ -1203,6 +1216,7 @@ public class GenerateProxy {
                     add.getParentNode().removeChild(add);
                 }
             } else {
+                payloadAttr.setNodeValue(StringEscapeUtils.escapeXml10(SOAP12_PAYLOAD_TYPE));
                 document.getElementsByTagName("Header").item(1)
                         .setTextContent(StringEscapeUtils.escapeXml10(SOAP12_CONTENT_TYPE));
             }
@@ -1210,7 +1224,7 @@ public class GenerateProxy {
             APIMap apiMap = messageTemplates.get(operationName);
             Document operationPayload = null;
             // edgeui-654 (check for getBytes().length
-            if (xmlUtils.isValidXML(apiMap.getSoapBody()) &&
+            if (XMLUtils.isValidXML(apiMap.getSoapBody()) &&
                     apiMap.getSoapBody().getBytes().length < BODY_LIMIT_SIZE) {
                 // JIRA-EDGEUI-672
                 operationPayload = xmlUtils.getXMLFromString(replaceReservedVariables(apiMap.getSoapBody()));
@@ -1223,7 +1237,7 @@ public class GenerateProxy {
                 }
             }
             Node importedNode = document.importNode(operationPayload.getDocumentElement(), true);
-            payload.appendChild(importedNode);
+            payloadNode.appendChild(importedNode);
         }
         else
         {
@@ -2805,17 +2819,11 @@ public class GenerateProxy {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") //todo
     private void parseWSDL() throws Exception {
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
         XMLUtils xmlUtils = new XMLUtils();
-
-        StringWriter writer = new StringWriter();
-        SOARequestCreator creator = new SOARequestCreator(wsdl, new RequestTemplateCreator(),
-            new MarkupBuilder(writer));
-        // edgeui-654
-        creator.setMaxRecursionDepth(2);
 
         Binding binding = port.getBinding();
         PortType portType = binding.getPortType();
@@ -2857,17 +2865,16 @@ public class GenerateProxy {
                     if (!ALLPOST) {
                         verb = operationsMap.getVerb(op.getName(), selectedOperationList);
                         if ( verb == null ) {
-                            return;
+                            continue;
                         }
                     } else { // else POST
                         verb = "POST";
                     }
 
-
-
                     if (RPCSTYLE) {
                         apiMap = createAPIMap(op, wsdl, verb, resourcePath, xmlUtils);
-                    } else {// document style
+                    } else {
+                        // document style
                         // there can be soap messages with no parts. membrane
                         // soap can't construct soap
                         // template for such messages. manually build
@@ -2878,95 +2885,18 @@ public class GenerateProxy {
                                 .getElement();
 
                             if (requestElement != null) {
-                                namespace = (Map<String, String>) requestElement.getNamespaceContext();
-
                                 if (verb.equalsIgnoreCase("GET")) {
-                                    if (soapVersion.equalsIgnoreCase(SOAP_11)
-                                        || soapVersion.equalsIgnoreCase(SOAP_12)) {
-                                        creator.setCreator(new RequestTemplateCreator());
-                                        // use membrane SOAP to generate a SOAP
-                                        // Request
-                                        try {
-                                            creator.createRequest(port.getName(), op.getName(), binding.getName());
-                                            KeyValue<String, String> kv = xmlUtils
-                                                .replacePlaceHolders(writer.toString());
-
-                                            // sometimes membrane soa generates
-                                            // invalid soap
-                                            // this will cause the bundle to not
-                                            // be uploaded
-
-                                            // store the operation name, SOAP
-                                            // Request and
-                                            // the
-                                            // expected JSON Body in the map
-                                            apiMap = new APIMap(kv.getValue(), kv.getKey(), resourcePath, verb,
-                                                requestElement.getName(), false);
-                                            writer.getBuffer().setLength(0);
-                                        } catch (Exception e) {
-                                            LOGGER.warning("Membrane SOA failed to generate template.");
-                                            apiMap = createAPIMap(op, wsdl, verb, resourcePath, xmlUtils);
-                                        }
-                                    } else {
-                                        apiMap = createAPIMap(op, wsdl, verb, resourcePath, xmlUtils);
+                                    if (USE_JSON2XML) {
+                                        apiMap = parsePost(op, resourcePath, verb);
+                                    }
+                                    else {
+                                        apiMap = parseGet(op, resourcePath);
                                     }
                                 } else {
-                                    String namespaceUri = null;
-                                    if (requestElement.getType() != null) {
-                                        namespaceUri = requestElement.getType().getNamespaceURI();
-                                    } else {
-                                        namespaceUri = requestElement.getEmbeddedType().getNamespaceUri();
-                                    }
-                                    String prefix = getPrefix(namespaceUri);
-
-                                    if (soapVersion.equalsIgnoreCase(SOAP_11)) {
-                                        xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT11_TEMPLATE), SOAP2API_XSL,
-                                            op.getName(), prefix, requestElement.getName(), namespaceUri,
-                                            namespace);
-                                    } else {
-                                        xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT12_TEMPLATE), SOAP2API_XSL,
-                                            op.getName(), prefix, requestElement.getName(), namespaceUri,
-                                            namespace);
-                                    }
-
-                                    TypeDefinition typeDefinition = null;
-
-                                    if (requestElement.getEmbeddedType() != null) {
-                                        typeDefinition = requestElement.getEmbeddedType();
-                                    } else {
-                                        typeDefinition = getTypeFromSchema(requestElement.getType(), wsdl.getSchemas());
-                                    }
-                                    if (typeDefinition instanceof ComplexType) {
-                                        ComplexType ct = (ComplexType) typeDefinition;
-                                        xpathElement.put(level, requestElement.getName());
-                                        parseSchema(ct.getModel(), wsdl.getSchemas(), requestElement.getName(),
-                                            namespaceUri, prefix);
-                                    }
-                                    if (TOO_MANY) {
-                                        LOGGER.warning(op.getName()
-                                            + ": Too many nested schemas or elements. Skipping XSLT gen. Manual intervention necessary");
-                                        ruleList.clear();
-                                        apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
-                                            false);
-                                    } else {
-                                        // rule list is > 0, there are
-                                        // additional
-                                        // namespaces to add
-                                        if (ruleList.size() > 0) {
-                                            RuleSet rs = new RuleSet();
-                                            rs.addRuleList(ruleList);
-                                            xmlUtils.generateOtherNamespacesXSLT(SOAP2API_XSL, op.getName(),
-                                                rs.getTransform(soapVersion), namespace);
-                                            ruleList.clear();
-                                            apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
-                                                true);
-                                        } else {
-                                            apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
-                                                false);
-                                        }
-                                    }
+                                    apiMap = parsePost(op, resourcePath, verb);
                                 }
-                            } else {// if the request element is null, it
+                            } else {
+                                // if the request element is null, it
                                 // appears membrane soap failed again.
                                 // attempting manual build
                                 apiMap = createAPIMap(op, wsdl, verb, resourcePath, xmlUtils);
@@ -2974,6 +2904,8 @@ public class GenerateProxy {
                         }
                     }
                 }
+
+
                 messageTemplates.put(op.getName(), apiMap);
             } catch (Exception e) {
                 LOGGER.severe(e.getMessage());
@@ -3001,8 +2933,10 @@ public class GenerateProxy {
                             LOGGER.fine("Found Operation Name: " + bop.getName() + " SOAPAction: "
                                 + soapAction);
                             APIMap apiM = messageTemplates.get(bop.getName());
-                            apiM.setSoapAction(soapAction);
-                            messageTemplates.put(bop.getName(), apiM);
+                            if ( apiM != null) {
+                                apiM.setSoapAction(soapAction);
+                                messageTemplates.put(bop.getName(), apiM);
+                            }
                         }
                     }
                 }
@@ -3010,6 +2944,118 @@ public class GenerateProxy {
         }
         LOGGER.exiting(GenerateProxy.class.getName(), new Object() {
         }.getClass().getEnclosingMethod().getName());
+    }
+
+    private APIMap parsePost(Operation op, String resourcePath, String verb) throws Exception {
+
+        APIMap apiMap;
+        XMLUtils xmlUtils = new XMLUtils();
+        com.predic8.schema.Element requestElement = op.getInput().getMessage().getParts().get(0)
+                .getElement();
+        namespace = (Map<String, String>) requestElement.getNamespaceContext();
+        String namespaceUri = null;
+        if (requestElement.getType() != null) {
+            namespaceUri = requestElement.getType().getNamespaceURI();
+        } else {
+            namespaceUri = requestElement.getEmbeddedType().getNamespaceUri();
+        }
+        String prefix = getPrefix(namespaceUri);
+
+        if (soapVersion.equalsIgnoreCase(SOAP_11)) {
+            xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT11_TEMPLATE), SOAP2API_XSL,
+                op.getName(), prefix, requestElement.getName(), namespaceUri,
+                namespace);
+        } else {
+            xmlUtils.generateRootNamespaceXSLT( getTemplate(SOAP2API_XSLT12_TEMPLATE), SOAP2API_XSL,
+                op.getName(), prefix, requestElement.getName(), namespaceUri,
+                namespace);
+        }
+
+        TypeDefinition typeDefinition = null;
+
+        if (requestElement.getEmbeddedType() != null) {
+            typeDefinition = requestElement.getEmbeddedType();
+        } else {
+            typeDefinition = getTypeFromSchema(requestElement.getType(), wsdl.getSchemas());
+        }
+
+        if (typeDefinition instanceof ComplexType) {
+            ComplexType ct = (ComplexType) typeDefinition;
+            xpathElement.put(level, requestElement.getName());
+            parseSchema(ct.getModel(), wsdl.getSchemas(), requestElement.getName(),
+                namespaceUri, prefix);
+        }
+
+        if (TOO_MANY) {
+            LOGGER.warning(op.getName()
+                + ": Too many nested schemas or elements. Skipping XSLT gen. " +
+                    "Manual intervention necessary");
+            ruleList.clear();
+            apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
+                false);
+        } else {
+            // rule list is > 0, there are
+            // additional
+            // namespaces to add
+            if (ruleList.size() > 0) {
+                RuleSet rs = new RuleSet();
+                rs.addRuleList(ruleList);
+                xmlUtils.generateOtherNamespacesXSLT(SOAP2API_XSL, op.getName(),
+                    rs.getTransform(soapVersion), namespace);
+                ruleList.clear();
+
+                apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
+                    true);
+            } else {
+                apiMap = new APIMap("", "", resourcePath, verb, requestElement.getName(),
+                    false);
+            }
+        }
+        return apiMap;
+    }
+
+    private APIMap parseGet(Operation op, String resourcePath) throws Exception {
+        APIMap apiMap;
+        StringWriter writer = new StringWriter();
+        SOARequestCreator creator = new SOARequestCreator(wsdl, new RequestTemplateCreator(),
+                new MarkupBuilder(writer));
+        // edgeui-654
+        creator.setMaxRecursionDepth(2);
+        XMLUtils xmlUtils = new XMLUtils();
+        if (soapVersion.equalsIgnoreCase(SOAP_11)
+            || soapVersion.equalsIgnoreCase(SOAP_12)) {
+            creator.setCreator(new RequestTemplateCreator());
+            // use membrane SOAP to generate a SOAP
+            // Request
+            try {
+                Binding binding = port.getBinding();
+                creator.createRequest(port.getName(), op.getName(), binding.getName());
+                KeyValue<String, String> kv = xmlUtils
+                    .replacePlaceHolders(writer.toString());
+
+                // sometimes membrane soa generates
+                // invalid soap
+                // this will cause the bundle to not
+                // be uploaded
+
+                // store the operation name, SOAP
+                // Request and
+                // the
+                // expected JSON Body in the map
+                com.predic8.schema.Element requestElement = op.getInput().getMessage().getParts().get(0)
+                        .getElement();
+                apiMap = new APIMap(kv.getValue(), kv.getKey(), resourcePath, "GET",
+                    requestElement.getName(), false);
+                writer.getBuffer().setLength(0);
+            } catch (Exception e) {
+                LOGGER.warning("Membrane SOA failed to generate template.");
+
+                apiMap = createAPIMap(op, wsdl, "GET", resourcePath, xmlUtils);
+            }
+        } else {
+            apiMap = createAPIMap(op, wsdl, "GET", resourcePath, xmlUtils);
+        }
+        return apiMap;
     }
 
     private String getOperationSOAPAction(BindingOperation bop) {
@@ -3315,6 +3361,7 @@ public class GenerateProxy {
         System.out.println("-bodyLimit=<4096>         defines trigger for simplified policy");
         System.out.println("-defaultOps=<GET|POST|NULL>    default HTTP method if opsMap defined");
         System.out.println("-caseInsensitive=<true|false>  if true, case insensitive flow conditions. Default is false");
+        System.out.println("-useJson2Xml=<true|false>      if true, GET is generated using JSON 2 XML");
         System.out.println("");
         System.out.println("");
         System.out.println("Examples:");
@@ -3449,6 +3496,8 @@ public class GenerateProxy {
         opt.getSet().addOption("bodyLimit", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
         // set default ops, GET is default.
         opt.getSet().addOption("defaultOps", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
+        // set useJson2Xml for GET
+        opt.getSet().addOption("useJson2Xml", Separator.EQUALS, Multiplicity.ZERO_OR_ONE);
 
         opt.check();
 
@@ -3503,6 +3552,10 @@ public class GenerateProxy {
         if (opt.getSet().isSet("defaultOps")) {
             String defaultOps = opt.getSet().getOption("defaultOps").getResultValue(0).toUpperCase();
             genProxy.setDefaultOps("NULL".equals(defaultOps) ? null : defaultOps);
+        }
+
+        if (opt.getSet().isSet("useJson2Xml")) {
+            genProxy.setUseJson2Xml(Boolean.valueOf(opt.getSet().getOption("useJson2Xml").getResultValue(0)));
         }
 
         if (opt.getSet().isSet("bodyLimit")) {
@@ -3609,6 +3662,10 @@ public class GenerateProxy {
         genProxy.setTemplateFolder( generateProxyOptions.getTemplateFolder() );
         genProxy.setQuotaAPIKey(generateProxyOptions.isApiKey() && generateProxyOptions.isQuota());
         genProxy.setQuotaOAuth(generateProxyOptions.isOauth() && generateProxyOptions.isQuota());
+        genProxy.setUseJson2Xml(generateProxyOptions.isUseJson2XML());
+        genProxy.setDefaultOps(generateProxyOptions.getDefaultOps());
+        genProxy.setBodyLimitSize(generateProxyOptions.getBodyLimitSize());
+
         if (generateProxyOptions.getOperationsFilter() != null
             && generateProxyOptions.getOperationsFilter().length() > 0) {
             genProxy.setSelectedOperationsJson(generateProxyOptions.getOperationsFilter());

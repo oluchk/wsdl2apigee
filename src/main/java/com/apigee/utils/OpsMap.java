@@ -1,6 +1,5 @@
 package com.apigee.utils;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -9,7 +8,6 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -32,9 +30,6 @@ public class OpsMap {
 	private List<Operation> opsMap = new ArrayList<Operation>();
 	private String defaultOps = "GET";
 
-	//TODO
-	private List<String> DEF_GET_STEPS  = Arrays.asList();
-	private List<String> DEF_POST_STEPS = Arrays.asList();
 
 	public OpsMap(String defaultOps) {
 		this.defaultOps = defaultOps;
@@ -46,8 +41,8 @@ public class OpsMap {
 		readOperationsMap(OPSMAPPING_TEMPLATE);
 	}
 
-	private void addOps (String operationName, String location, String verb, List<String> steps) {
-		Operation o = new Operation(operationName, location, verb, steps);
+	private void addOps (String operationName, String location, String verb) {
+		Operation o = new Operation(operationName, location, verb);
 		opsMap.add(o);
 	}
 	
@@ -114,19 +109,10 @@ public class OpsMap {
 			for (int i = 0; i < getOpsList.getLength(); i++) {
 				if (getOpsList.item(i).getNodeType() == Node.ELEMENT_NODE) {
 					Element operation = (Element)getOpsList.item(i);
-					String name = operation.getElementsByTagName("pattern").item(0).getTextContent();
-					String location = operation.getElementsByTagName("pattern").item(0).getTextContent();
+					String pattern = operation.getElementsByTagName("pattern").item(0).getTextContent();
+					String location = operation.getElementsByTagName("location").item(0).getTextContent();
 
-					List<String> list = new ArrayList<>();
-					NodeList steps = operation.getElementsByTagName("step");
-					for (int j = 0; j < steps.getLength(); j++) {
-						String step = steps.item(i).getTextContent();
-						list.add(step);
-					}
-					if ( list.isEmpty() ){
-						list = "GET".equalsIgnoreCase(verbNode.getTextContent()) ? DEF_GET_STEPS : DEF_POST_STEPS;
-					}
-					addOps (name, location, verb.toUpperCase(), list);
+					addOps (pattern.toLowerCase(), location, verb.toUpperCase());
 				}
 			}
 		}

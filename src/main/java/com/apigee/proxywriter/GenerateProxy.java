@@ -721,8 +721,11 @@ public class GenerateProxy {
                     Node step0 = buildStep(proxyDefault, operationName + "-query-to-json");
                     request.appendChild(step0);
 
-                    Node step = buildStep(proxyDefault, operationName + "-json-to-xml");
+                    Node step = buildStep(proxyDefault,  "set-json-payload");
                     request.appendChild(step);
+
+                    Node step2 = buildStep(proxyDefault, operationName + "-json-to-xml");
+                    request.appendChild(step2);
                 }
                 else {
                     if ( apiMap.getSoapBody().length() < BODY_LIMIT_SIZE ) {
@@ -1472,6 +1475,9 @@ public class GenerateProxy {
                 Files.copy(getSourceStream(sourcePath, "get-response-soap-body-xml.xml"),
                     Paths.get(targetPath + "get-response-soap-body-xml.xml"),
                     StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(getSourceStream(sourcePath, "set-json-payload.xml"),
+                        Paths.get(targetPath + "set-json-payload.xml"),
+                        StandardCopyOption.REPLACE_EXISTING);
 
                 String contentType = "application/soap+xml";
                 if (soapVersion.equalsIgnoreCase(SOAP_11)){

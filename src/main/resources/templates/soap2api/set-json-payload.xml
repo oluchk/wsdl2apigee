@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<AssignMessage continueOnError="false" enabled="true" name="set-json-payload">
+    <DisplayName>set-json-payload</DisplayName>
+    <Properties/>
+    <Set>
+        <Verb>POST</Verb>
+        <Payload contentType="application/json">{requestData}</Payload>
+    </Set>
+    <Remove>
+        <QueryParams/>
+    </Remove>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+    <AssignTo createNew="false" transport="http" type="request"/>
+</AssignMessage>

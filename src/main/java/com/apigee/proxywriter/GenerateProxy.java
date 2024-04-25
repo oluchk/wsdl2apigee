@@ -454,9 +454,9 @@ public class GenerateProxy {
         Document apiTemplateDocument = xmlUtils
             .readXML(buildFolder + File.separator + "apiproxy" + File.separator + proxyName + ".xml");
 
-
         Document assignTemplate = xmlUtils.readXML( getTemplate(SOAP2API_ASSIGN_TEMPLATE) );
         Document returnOASTemplate = xmlUtils.readXML( getTemplate(SOAP2API_RETURN_OPENAPI_TEMPLATE) );
+        Document jsonXMLTemplate = xmlUtils.readXML( getTemplate(SOAP2API_JSON_TO_XML_TEMPLATE) );
 
         // Document jsPolicyTemplate =
         // xmlUtils.readXML(SOAP2API_JSPOLICY_TEMPLATE);
@@ -467,8 +467,6 @@ public class GenerateProxy {
         } else {
             addNamespaceTemplate = xmlUtils.readXML( getTemplate(SOAP2API_XSLT12POLICY_TEMPLATE) );
         }
-
-        Document jsonXMLTemplate = xmlUtils.readXML( getTemplate(SOAP2API_JSON_TO_XML_TEMPLATE) );
 
         Node description = proxyDefault.getElementsByTagName("Description").item(0);
         description.setTextContent(proxyDescription);
@@ -544,6 +542,7 @@ public class GenerateProxy {
 
             if (QUOTAAPIKEY) {
                 String quota = "impose-quota-apikey";
+                
                 Node policy1 = apiTemplateDocument.createElement("Policy");
                 policy1.setTextContent(quota);
                 policies.appendChild(policy1);
@@ -551,7 +550,6 @@ public class GenerateProxy {
                 Node step1 = buildStep(proxyDefault, quota);
                 preFlowRequest.appendChild(step1);
             }
-
         }
 
         if ( CALLOUT_ACL ){
@@ -693,7 +691,7 @@ public class GenerateProxy {
         for (Map.Entry<String, APIMap> entry : messageTemplates.entrySet()) {
             String operationName = entry.getKey();
             APIMap apiMap = entry.getValue();
-            String buildSOAPPolicy = operationName + "-build-soap";
+
             String jsonToXML = operationName + "-json-to-xml";
 
             // String jsPolicyName = operationName + "-root-wrapper";
@@ -726,31 +724,40 @@ public class GenerateProxy {
 
                     Node step2 = buildStep(proxyDefault, operationName + "-json-to-xml");
                     request.appendChild(step2);
+
+                    Node step3 = buildStep(proxyDefault, operationName + "-build-soap");
+                    request.appendChild(step3);
+
+                    Node step4 = buildStep(proxyDefault, operationName + "-add-namespace");
+                    request.appendChild(step4);
+
+                    LOGGER.fine("Query to Json: " + operationName + "-query-to-json");
+                    LOGGER.fine("Set Payload to Json: " +  "set-json-payload");
+                    LOGGER.fine("Json to XML: " + operationName + "json-to-xmls");
+                    LOGGER.fine("Assign SOAP variables: " + operationName + "-build-soap");
+                    LOGGER.fine("Add Namespaces: " + operationName + "-add-namespace");
                 }
                 else {
                     if ( apiMap.getSoapBody().length() < BODY_LIMIT_SIZE ) {
                         if (apiMap.getJsonBody() != null) {
                             Node step = buildStep(proxyDefault, operationName + "-extract-query-param");
                             request.appendChild(step);
+
+                            Node step2 = buildStep(proxyDefault, operationName + "-build-soap");
+                            request.appendChild(step2);
+
+                            Node step3 = buildStep(proxyDefault, "remove-empty-nodes", "(verb == \"GET\")");
+                            request.appendChild(step3);
+
+                            LOGGER.fine("Extract Variable: " + operationName + "-extract-query-param");
+                            LOGGER.fine("Assign Message: " + operationName + "-build-soap");
+                            LOGGER.fine("Remove empty nodes: " + "remove-empty-nodes");
                         }
                     }
                     else {
                         LOGGER.warning( operationName + "-extract-query-param skipped" );
                     }
                 }
-
-                step1 = buildStep(proxyDefault, buildSOAPPolicy);
-                request.appendChild(step1);
-
-                if ( apiMap.getSoapBody().length() < BODY_LIMIT_SIZE) {
-                    if (apiMap.getJsonBody() != null) {
-                        Node step = buildStep(proxyDefault, "remove-empty-nodes", "(verb == \"GET\")");
-                        request.appendChild(step);
-                    }
-                }
-
-                LOGGER.fine("Assign Message: " + buildSOAPPolicy);
-                LOGGER.fine("Extract Variable: " + operationName + "-extract-query-param");
 
             } else {
                 // add root wrapper policy
@@ -809,7 +816,19 @@ public class GenerateProxy {
 
                     // write Query to JSON Policy
                     writeQueryToJsonPolicy(queryTemplate, operationName);
+                    // write Json To XML Policy
                     writeJsonToXMLPolicy(jsonXMLTemplate, operationName);
+
+                    Node policy = apiTemplateDocument.createElement("Policy");
+                    policy.setTextContent(operationName + "add-namespace");
+                    policies.appendChild(policy);
+                    Node resourceAddNamespaces = apiTemplateDocument.createElement("Resource");
+                    resourceAddNamespaces.setTextContent("xsl://" + operationName + "add-namespace.xslt");
+                    resources.appendChild(resourceAddNamespaces);
+
+                    // write Add name space Policy
+                    writeAddNamespacePolicy(addNamespaceTemplate, operationName, false);
+
                 }
                 else {
                     if (apiMap.getSoapBody().length() < BODY_LIMIT_SIZE) {
@@ -830,14 +849,23 @@ public class GenerateProxy {
                 }
 
                 Node policy2 = apiTemplateDocument.createElement("Policy");
-                policy2.setTextContent(buildSOAPPolicy);
+                policy2.setTextContent(operationName + "-build-soap");
                 policies.appendChild(policy2);
 
                 // write Assign Message Policy
-                writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
-                        operationName + "-build-soap",
-                        operationName + " Build SOAP",
-                     apiMap.getSoapAction(), true);
+                if ( USE_JSON2XML) {
+                    writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
+                            operationName + "-build-soap",
+                            operationName + " Assign SOAP Variables",
+                            apiMap.getSoapAction(), false);
+                }
+                else {
+                    writeSOAP2APIAssignMessagePolicies(assignTemplate, operationName,
+                            operationName + "-build-soap",
+                            operationName + " Build SOAP",
+                            apiMap.getSoapAction(), true);
+                }
+
             } else {
 
                 /*
@@ -855,9 +883,10 @@ public class GenerateProxy {
 
                 writeJsonToXMLPolicy(jsonXMLTemplate, operationName);
 
-                Node policy3 = apiTemplateDocument.createElement("Policy");
-                policy3.setTextContent(operationName + "add-namespace");
-                policies.appendChild(policy3);
+                Node policy = apiTemplateDocument.createElement("Policy");
+                policy.setTextContent(operationName + "add-namespace");
+                policies.appendChild(policy);
+
                 Node resourceAddNamespaces = apiTemplateDocument.createElement("Resource");
                 resourceAddNamespaces.setTextContent("xsl://" + operationName + "add-namespace.xslt");
                 resources.appendChild(resourceAddNamespaces);
@@ -872,9 +901,9 @@ public class GenerateProxy {
                     resourceAddOtherNamespaces.setTextContent("xsl://" + operationName + "add-other-namespaces.xslt");
                     resources.appendChild(resourceAddOtherNamespaces);
 
-                    writeAddNamespace(addNamespaceTemplate, operationName, true);
+                    writeAddNamespacePolicy(addNamespaceTemplate, operationName, true);
                 } else {
-                    writeAddNamespace(addNamespaceTemplate, operationName, false);
+                    writeAddNamespacePolicy(addNamespaceTemplate, operationName, false);
                 }
 
                 if (SOAP_HEADER) {
@@ -1047,7 +1076,7 @@ public class GenerateProxy {
         }.getClass().getEnclosingMethod().getName());
     }
 
-    private void writeAddNamespace(Document namespaceTemplate, String operationName, boolean addOtherNamespaces)
+    private void writeAddNamespacePolicy(Document document, String operationName, boolean addOtherNamespaces)
         throws Exception {
 
         LOGGER.entering(GenerateProxy.class.getName(), new Object() {
@@ -1055,7 +1084,7 @@ public class GenerateProxy {
         try {
             XMLUtils xmlUtils = new XMLUtils();
             String policyName = operationName + "-add-namespace";
-            Document xslPolicyXML = xmlUtils.cloneDocument(namespaceTemplate);
+            Document xslPolicyXML = xmlUtils.cloneDocument(document);
 
             Node rootElement = xslPolicyXML.getFirstChild();
             NamedNodeMap attr = rootElement.getAttributes();
@@ -1073,7 +1102,7 @@ public class GenerateProxy {
 
             if (addOtherNamespaces) {
                 String policyNameOther = operationName + "-add-other-namespaces";
-                Document xslPolicyXMLOther = xmlUtils.cloneDocument(namespaceTemplate);
+                Document xslPolicyXMLOther = xmlUtils.cloneDocument(document);
 
                 Node rootElementOther = xslPolicyXMLOther.getFirstChild();
                 NamedNodeMap attrOther = rootElementOther.getAttributes();

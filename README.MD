@@ -4,6 +4,10 @@ wsdl2apigee is an open source project that extends Apigee Edge functionality to 
 * Expose a SOAP Service as a REST API (over JSON or XML) or
 * Expose a SOAP Service in a pass through mode for deployment on Apigee Edge
 
+# This branch included several improvements:
+* Customizable templates for Apigee assets
+* Additional algorithms for implementatiin GET from WSDL
+
 ## Support
 This is an open-source project of the Apigee Corporation. It is not covered by Apigee support contracts. However, we will support you as best we can. For help, please open an issue in this GitHub project. You are also always welcome to submit a pull request.
 
